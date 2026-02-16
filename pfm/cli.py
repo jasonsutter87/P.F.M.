@@ -8,6 +8,7 @@ Commands:
   pfm validate - Validate a .pfm file (checksum, structure)
   pfm convert  - Convert to/from JSON, CSV, TXT, Markdown
   pfm identify - Quick check if a file is PFM format
+  pfm view     - View a .pfm file (TUI, web, or HTML export)
 """
 
 from __future__ import annotations
@@ -147,6 +148,39 @@ def cmd_convert(args: argparse.Namespace) -> None:
             print(result, end="")
 
 
+def cmd_view(args: argparse.Namespace) -> None:
+    """View a .pfm file in TUI, web browser, or as static HTML."""
+    path = args.path
+
+    if args.html:
+        # Generate standalone HTML file
+        from pfm.web.generator import write_html
+
+        output = args.output or Path(path).stem + ".html"
+        nbytes = write_html(path, output)
+        print(f"Generated {output} ({nbytes} bytes)")
+        return
+
+    if args.web:
+        # Launch local web server + open browser
+        from pfm.web.server import serve
+
+        serve(path, open_browser=True)
+        return
+
+    # Default: TUI viewer
+    try:
+        from pfm.tui.viewer import run_viewer
+    except ImportError:
+        print(
+            "TUI viewer requires the 'textual' package.\n"
+            "Install it with: pip install \"pfm[tui]\"",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    run_viewer(path)
+
+
 def cmd_identify(args: argparse.Namespace) -> None:
     """Quick check if a file is PFM format."""
     from pfm.reader import PFMReader
@@ -196,6 +230,13 @@ def main() -> None:
     p_convert.add_argument("input", help="Input file path")
     p_convert.add_argument("-o", "--output", help="Output file path")
 
+    # view
+    p_view = sub.add_parser("view", help="View a .pfm file (TUI, web, or HTML)")
+    p_view.add_argument("path", help="Path to .pfm file")
+    p_view.add_argument("--web", action="store_true", help="Open in web browser (local server)")
+    p_view.add_argument("--html", action="store_true", help="Generate standalone HTML file")
+    p_view.add_argument("-o", "--output", help="Output path for --html mode")
+
     # identify
     p_identify = sub.add_parser("identify", help="Quick check if a file is PFM")
     p_identify.add_argument("path", help="Path to file")
@@ -212,6 +253,7 @@ def main() -> None:
         "read": cmd_read,
         "validate": cmd_validate,
         "convert": cmd_convert,
+        "view": cmd_view,
         "identify": cmd_identify,
     }
 

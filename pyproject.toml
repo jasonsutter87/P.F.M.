@@ -26,6 +26,7 @@ pfm = "pfm.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-cov>=4.0"]
+tui = ["textual>=0.83.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
