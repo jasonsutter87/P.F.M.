@@ -1,0 +1,83 @@
+{
+  "name": "pfm-viewer",
+  "displayName": "PFM Viewer",
+  "description": "Viewer for PFM (Pure Fucking Magic) AI agent output files",
+  "version": "0.1.0",
+  "publisher": "pfm",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Visualization"
+  ],
+  "activationEvents": [
+    "onLanguage:pfm"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "pfm",
+        "aliases": [
+          "PFM",
+          "Pure Fucking Magic"
+        ],
+        "extensions": [
+          ".pfm"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "pfm",
+        "scopeName": "source.pfm",
+        "path": "./syntaxes/pfm.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "pfm.openPreview",
+        "title": "PFM: Open Preview",
+        "icon": "$(preview)"
+      },
+      {
+        "command": "pfm.validateChecksum",
+        "title": "PFM: Validate Checksum"
+      },
+      {
+        "command": "pfm.goToSection",
+        "title": "PFM: Go to Section"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "when": "resourceLangId == pfm",
+          "command": "pfm.openPreview",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "pfm.openPreview",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "resourceLangId == pfm"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "npx @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^3.0.0"
+  }
+}

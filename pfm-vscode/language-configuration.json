@@ -1,0 +1,11 @@
+{
+  "comments": {},
+  "brackets": [],
+  "autoClosingPairs": [],
+  "folding": {
+    "markers": {
+      "start": "^#@",
+      "end": "^(?=#@|#!END)"
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "PFM",
+  "scopeName": "source.pfm",
+  "patterns": [
+    { "include": "#magic-line" },
+    { "include": "#eof-marker" },
+    { "include": "#section-header" },
+    { "include": "#meta-key-value" },
+    { "include": "#index-entry" },
+    { "include": "#escaped-line" }
+  ],
+  "repository": {
+    "magic-line": {
+      "match": "^(#!PFM)(/[\\d.]+)?(:\\w+)?$",
+      "captures": {
+        "1": { "name": "keyword.control.magic.pfm" },
+        "2": { "name": "constant.numeric.version.pfm" },
+        "3": { "name": "entity.name.tag.stream-flag.pfm" }
+      }
+    },
+    "eof-marker": {
+      "match": "^(#!END)(:\\d+)?$",
+      "captures": {
+        "1": { "name": "keyword.control.eof.pfm" },
+        "2": { "name": "constant.numeric.offset.pfm" }
+      }
+    },
+    "section-header": {
+      "match": "^(#@)(\\S+)$",
+      "captures": {
+        "1": { "name": "punctuation.definition.section.pfm" },
+        "2": { "name": "entity.name.section.pfm" }
+      }
+    },
+    "meta-key-value": {
+      "match": "^(id|agent|model|created|checksum|parent|tags|version)(:\\s)(.*)$",
+      "captures": {
+        "1": { "name": "variable.other.meta-key.pfm" },
+        "2": { "name": "punctuation.separator.key-value.pfm" },
+        "3": { "name": "string.unquoted.meta-value.pfm" }
+      }
+    },
+    "index-entry": {
+      "match": "^([a-z0-9_-]+)\\s+(\\d+)\\s+(\\d+)$",
+      "captures": {
+        "1": { "name": "entity.name.section.index.pfm" },
+        "2": { "name": "constant.numeric.offset.pfm" },
+        "3": { "name": "constant.numeric.length.pfm" }
+      }
+    },
+    "escaped-line": {
+      "match": "^(\\\\)(#[@!].*)$",
+      "captures": {
+        "1": { "name": "constant.character.escape.pfm" },
+        "2": { "name": "string.other.escaped-content.pfm" }
+      }
+    }
+  }
+}
