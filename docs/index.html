@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none';">
+<title>PFM Viewer -- Pure Fucking Magic</title>
+<meta name="description" content="View .pfm AI agent output files in your browser. Drag and drop, no upload, fully client-side.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x2728;</text></svg>">
+<style>
+/* ===== Reset & Variables ===== */
+:root {
+  --bg:          #0d1117;
+  --bg-surface:  #161b22;
+  --bg-card:     #1c2128;
+  --bg-hover:    #262c36;
+  --bg-active:   #1f6feb22;
+  --text:        #e6edf3;
+  --text-muted:  #7d8590;
+  --text-dim:    #484f58;
+  --accent:      #58a6ff;
+  --accent-hover:#79c0ff;
+  --green:       #3fb950;
+  --green-bg:    #3fb95018;
+  --red:         #f85149;
+  --red-bg:      #f8514918;
+  --orange:      #d29922;
+  --purple:      #bc8cff;
+  --border:      #30363d;
+  --border-focus:#58a6ff;
+  --radius:      8px;
+  --radius-lg:   12px;
+  --font:        -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --mono:        'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  --shadow:      0 3px 12px rgba(0,0,0,.4);
+  --transition:  150ms ease;
+}
+.light {
+  --bg:          #ffffff;
+  --bg-surface:  #f6f8fa;
+  --bg-card:     #ffffff;
+  --bg-hover:    #eaeef2;
+  --bg-active:   #ddf4ff;
+  --text:        #1f2328;
+  --text-muted:  #656d76;
+  --text-dim:    #b1bac4;
+  --accent:      #0969da;
+  --accent-hover:#0550ae;
+  --green:       #1a7f37;
+  --green-bg:    #dafbe1;
+  --red:         #cf222e;
+  --red-bg:      #ffebe9;
+  --orange:      #9a6700;
+  --purple:      #8250df;
+  --border:      #d0d7de;
+  --border-focus:#0969da;
+  --shadow:      0 3px 12px rgba(0,0,0,.12);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  height: 100%;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; cursor: pointer; }
+input { font-family: inherit; }
+
+/* ===== Landing Screen ===== */
+#landing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+  transition: opacity var(--transition);
+}
+#landing.hidden { display: none; }
+
+.landing-logo {
+  font-size: 64px;
+  margin-bottom: 16px;
+  filter: drop-shadow(0 0 24px rgba(88,166,255,.3));
+}
+.landing-title {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+.landing-subtitle {
+  font-size: 18px;
+  color: var(--text-muted);
+  max-width: 480px;
+  margin-bottom: 40px;
+}
+
+/* Drop Zone */
+.drop-zone {
+  width: 100%;
+  max-width: 520px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: 48px 32px;
+  transition: all var(--transition);
+  background: var(--bg-surface);
+  cursor: pointer;
+  position: relative;
+}
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: var(--accent);
+  background: var(--bg-active);
+}
+.drop-zone.dragover {
+  transform: scale(1.02);
+  box-shadow: 0 0 0 4px rgba(88,166,255,.15);
+}
+.drop-zone-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  opacity: .7;
+}
+.drop-zone-text {
+  font-size: 16px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.drop-zone-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.drop-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.landing-or {
+  color: var(--text-dim);
+  margin: 24px 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.demo-btn {
+  padding: 10px 28px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-weight: 600;
+  transition: all var(--transition);
+}
+.demo-btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.landing-footer {
+  position: absolute;
+  bottom: 24px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.landing-footer a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.landing-footer a:hover { color: var(--accent); }
+
+/* Ecosystem cards */
+.ecosystem {
+  display: flex;
+  gap: 12px;
+  margin-top: 32px;
+  max-width: 640px;
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.eco-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--text);
+  transition: all var(--transition);
+  min-width: 180px;
+  flex: 1;
+}
+.eco-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-active);
+  transform: translateY(-1px);
+}
+.eco-icon { font-size: 20px; flex-shrink: 0; }
+.eco-info { text-align: left; }
+.eco-label { font-size: 13px; font-weight: 600; }
+.eco-cmd {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+
+/* Install snippet */
+.install-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  max-width: 520px;
+  width: 100%;
+}
+.install-card {
+  flex: 1;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  text-align: left;
+  position: relative;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.install-card:hover {
+  border-color: var(--accent);
+}
+.install-card::after {
+  content: 'Click to copy';
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  font-size: 9px;
+  color: var(--text-dim);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.install-card:hover::after { opacity: 1; }
+.install-card.copied::after { content: 'Copied!'; color: var(--green); opacity: 1; }
+.install-lang {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.install-cmd {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--accent);
+}
+
+/* ===== Viewer Screen ===== */
+#viewer {
+  display: none;
+  height: 100%;
+  flex-direction: column;
+}
+#viewer.active {
+  display: flex;
+}
+
+/* Top bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 48px;
+  min-height: 48px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-brand {
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 15px;
+  margin-right: 4px;
+}
+.topbar-filename {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+.topbar-spacer { flex: 1; }
+.topbar-btn {
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  transition: all var(--transition);
+}
+a.topbar-btn { text-decoration: none; }
+.topbar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+.topbar-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.topbar-btn.primary:hover {
+  background: var(--accent-hover);
+}
+
+/* Layout */
+.layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 288px;
+  min-width: 288px;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-section {
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-section-header {
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+.sidebar-section-header:hover { color: var(--text); }
+.sidebar-section-body { padding: 0 16px 12px; }
+
+/* Checksum badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge.valid { color: var(--green); background: var(--green-bg); }
+.badge.invalid { color: var(--red); background: var(--red-bg); }
+
+/* Meta */
+.meta-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.meta-key {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.meta-val {
+  font-size: 12px;
+  color: var(--text);
+  font-family: var(--mono);
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+/* Search */
+.search-wrap {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.search-input {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.search-input::placeholder { color: var(--text-dim); }
+.search-input:focus { border-color: var(--border-focus); }
+
+/* Section list */
+.section-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.section-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 16px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 80ms ease;
+  user-select: none;
+}
+.section-item:hover {
+  background: var(--bg-hover);
+}
+.section-item.active {
+  background: var(--bg-active);
+  border-left-color: var(--accent);
+}
+.section-item-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+.section-item.active .section-item-name {
+  color: var(--accent);
+}
+.section-item-size {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+
+/* Main content */
+.content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+.content-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  min-height: 44px;
+}
+.content-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.content-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+.content-header-spacer { flex:1; }
+.content-wrap-toggle {
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  user-select: none;
+}
+.content-wrap-toggle:hover { background: var(--bg-hover); }
+.content-wrap-toggle.active { background: var(--bg-active); border-color: var(--accent); color: var(--accent); }
+
+.content-body {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+}
+.content-pre {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+  tab-size: 4;
+  white-space: pre;
+  margin: 0;
+}
+.content-pre.wrap {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Line numbers gutter */
+.code-container {
+  display: flex;
+}
+.line-numbers {
+  padding-right: 16px;
+  text-align: right;
+  user-select: none;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.7;
+  border-right: 1px solid var(--border);
+  margin-right: 16px;
+  min-width: 40px;
+  flex-shrink: 0;
+}
+
+/* Empty state in content */
+.content-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-dim);
+  font-size: 15px;
+}
+
+/* ===== Keyboard shortcut hints ===== */
+.kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: var(--mono);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--text-dim);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .sidebar { width: 220px; min-width: 220px; }
+  .landing-title { font-size: 28px; }
+}
+@media (max-width: 600px) {
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; min-width: unset; max-height: 45%; border-right: none; border-bottom: 1px solid var(--border); }
+}
+</style>
+</head>
+<body>
+
+<!-- ========== LANDING ========== -->
+<div id="landing">
+  <div class="landing-logo">&#x2728;</div>
+  <h1 class="landing-title">PFM Viewer</h1>
+  <p class="landing-subtitle">View AI agent output files in your browser. Everything runs client-side — your files never leave your machine.</p>
+
+  <div class="drop-zone" id="drop-zone">
+    <input type="file" id="file-input" accept=".pfm">
+    <div class="drop-zone-icon">&#128194;</div>
+    <div class="drop-zone-text">Drop a <strong>.pfm</strong> file here</div>
+    <div class="drop-zone-hint">or click to browse</div>
+  </div>
+
+  <div class="landing-or">or</div>
+
+  <button class="demo-btn" id="demo-btn">Load Demo File</button>
+
+  <!-- Install snippets -->
+  <div class="install-row">
+    <div class="install-card" onclick="copyInstall(this, 'npm install pfm')">
+      <div class="install-lang">JavaScript / TypeScript</div>
+      <div class="install-cmd">npm install pfm</div>
+    </div>
+    <div class="install-card" onclick="copyInstall(this, 'pip install pfm')">
+      <div class="install-lang">Python</div>
+      <div class="install-cmd">pip install pfm</div>
+    </div>
+  </div>
+
+  <!-- Ecosystem links -->
+  <div class="ecosystem">
+    <a class="eco-card" href="https://www.npmjs.com/package/pfm" target="_blank" rel="noopener">
+      <span class="eco-icon">&#x1F4E6;</span>
+      <span class="eco-info">
+        <span class="eco-label">npm</span>
+        <span class="eco-cmd">pfm</span>
+      </span>
+    </a>
+    <a class="eco-card" href="https://pypi.org/project/pfm/" target="_blank" rel="noopener">
+      <span class="eco-icon">&#x1F40D;</span>
+      <span class="eco-info">
+        <span class="eco-label">PyPI</span>
+        <span class="eco-cmd">pfm</span>
+      </span>
+    </a>
+    <a class="eco-card" href="https://github.com/jasonsutter87/P.F.M.-Pure-Fucking-Magic-" target="_blank" rel="noopener">
+      <span class="eco-icon">&#x1F4BB;</span>
+      <span class="eco-info">
+        <span class="eco-label">GitHub</span>
+        <span class="eco-cmd">Source &amp; Docs</span>
+      </span>
+    </a>
+  </div>
+
+  <div class="landing-footer">
+    <a href="https://github.com/jasonsutter87/P.F.M.-Pure-Fucking-Magic-">PFM</a> &mdash; Pure Fucking Magic. AI agent output container format.
+  </div>
+</div>
+
+<!-- ========== VIEWER ========== -->
+<div id="viewer">
+  <div class="topbar">
+    <span class="topbar-brand">PFM</span>
+    <span class="topbar-filename" id="v-filename"></span>
+    <span class="topbar-spacer"></span>
+    <button class="topbar-btn" id="btn-shortcuts" title="Keyboard shortcuts">&#9000; Shortcuts</button>
+    <button class="topbar-btn" id="btn-export-json">Export JSON</button>
+    <button class="topbar-btn" id="btn-export-md">Export MD</button>
+    <button class="topbar-btn" id="btn-theme">Theme</button>
+    <a class="topbar-btn" href="https://github.com/jasonsutter87/P.F.M.-Pure-Fucking-Magic-" target="_blank" rel="noopener">GitHub</a>
+    <button class="topbar-btn primary" id="btn-open-new">Open File</button>
+  </div>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- Checksum -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span>Status</span>
+          <span class="badge" id="v-checksum-badge"></span>
+        </div>
+      </div>
+
+      <!-- Metadata -->
+      <div class="sidebar-section" id="meta-section">
+        <div class="sidebar-section-header" id="meta-toggle">
+          <span>Metadata</span>
+          <span id="meta-count"></span>
+        </div>
+        <div class="sidebar-section-body" id="v-meta"></div>
+      </div>
+
+      <!-- Search -->
+      <div class="search-wrap">
+        <input type="text" class="search-input" id="v-search" placeholder="Filter sections... ( / )">
+      </div>
+
+      <!-- Section List -->
+      <div class="section-list" id="v-section-list"></div>
+    </div>
+
+    <!-- Content -->
+    <div class="content-area">
+      <div class="content-header">
+        <span class="content-title" id="v-content-title">Select a section</span>
+        <span class="content-meta" id="v-content-meta"></span>
+        <span class="content-header-spacer"></span>
+        <button class="content-wrap-toggle active" id="btn-wrap" title="Toggle word wrap">Wrap</button>
+      </div>
+      <div class="content-body" id="v-content-body">
+        <div class="content-empty">Select a section from the sidebar</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SHORTCUTS MODAL ========== -->
+<div id="shortcuts-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center;">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px 32px;max-width:400px;width:90%;box-shadow:var(--shadow);">
+    <h3 style="margin-bottom:16px;font-size:16px;">Keyboard Shortcuts</h3>
+    <table style="width:100%;font-size:13px;border-collapse:collapse;">
+      <tr><td style="padding:4px 0;"><span class="kbd">j</span> / <span class="kbd">&darr;</span></td><td>Next section</td></tr>
+      <tr><td style="padding:4px 0;"><span class="kbd">k</span> / <span class="kbd">&uarr;</span></td><td>Previous section</td></tr>
+      <tr><td style="padding:4px 0;"><span class="kbd">/</span></td><td>Focus search</td></tr>
+      <tr><td style="padding:4px 0;"><span class="kbd">Esc</span></td><td>Clear search / close modal</td></tr>
+      <tr><td style="padding:4px 0;"><span class="kbd">w</span></td><td>Toggle word wrap</td></tr>
+      <tr><td style="padding:4px 0;"><span class="kbd">t</span></td><td>Toggle theme</td></tr>
+      <tr><td style="padding:4px 0;"><span class="kbd">o</span></td><td>Open new file</td></tr>
+    </table>
+    <button class="topbar-btn" style="margin-top:16px;width:100%;" onclick="closeShortcuts()">Close</button>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   PFM Parser — Pure client-side .pfm parser
+   Mirrors the Python PFMReader logic exactly.
+   ================================================================ */
+const PFMParser = {
+  MAGIC: '#!PFM',
+  EOF: '#!END',
+  SEC: '#@',
+  MAX_SECTIONS: 10000,
+  MAX_META_FIELDS: 100,
+  MAX_SECTION_NAME_LEN: 64,
+
+  parse(text) {
+    const lines = text.split('\n');
+    const doc = {
+      formatVersion: '1.0',
+      isStream: false,
+      meta: {},
+      sections: [],
+      raw: text
+    };
+
+    let currentSection = null;
+    let sectionLines = [];
+    let inMeta = false;
+    let inIndex = false;
+    let metaFieldCount = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Magic line
+      if (line.startsWith(this.MAGIC)) {
+        const slash = line.indexOf('/');
+        if (slash !== -1) {
+          const rest = line.substring(slash + 1);
+          const colon = rest.indexOf(':');
+          doc.formatVersion = colon !== -1 ? rest.substring(0, colon) : rest;
+          doc.isStream = rest.includes(':STREAM');
+        }
+        continue;
+      }
+
+      // EOF
+      if (line.startsWith(this.EOF)) {
+        flush();
+        break;
+      }
+
+      // Section header (not escaped)
+      if (line.startsWith(this.SEC) && !line.startsWith('\\#')) {
+        flush();
+        const name = line.substring(this.SEC.length);
+        // Validate section name length
+        if (name.length > this.MAX_SECTION_NAME_LEN) {
+          currentSection = null;
+          continue;
+        }
+        inMeta = (name === 'meta');
+        inIndex = (name === 'index' || name === 'index:trailing');
+        if (!inMeta && !inIndex) {
+          // Enforce section count limit
+          if (doc.sections.length >= this.MAX_SECTIONS) {
+            currentSection = null;
+            continue;
+          }
+          currentSection = name;
+          sectionLines = [];
+        } else {
+          currentSection = null;
+        }
+        continue;
+      }
+
+      // Meta
+      if (inMeta) {
+        const sep = line.indexOf(': ');
+        if (sep !== -1 && metaFieldCount < this.MAX_META_FIELDS) {
+          const key = line.substring(0, sep).trim();
+          const val = line.substring(sep + 2).trim();
+          // Prevent prototype pollution: reject __proto__, constructor, prototype
+          if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+            continue;
+          }
+          doc.meta[key] = val;
+          metaFieldCount++;
+        }
+        continue;
+      }
+
+      // Index (skip)
+      if (inIndex) continue;
+
+      // Content
+      if (currentSection !== null) {
+        sectionLines.push(this.unescape(line));
+      }
+    }
+    flush();
+    return doc;
+
+    function flush() {
+      if (currentSection === null) return;
+      let content = sectionLines.join('\n');
+      if (content.endsWith('\n')) content = content.slice(0, -1);
+      doc.sections.push({ name: currentSection, content });
+      currentSection = null;
+      sectionLines = [];
+    }
+  },
+
+  unescape(line) {
+    return line.startsWith('\\#') ? line.substring(1) : line;
+  },
+
+  async checksum(sections) {
+    const encoder = new TextEncoder();
+    let allBytes = new Uint8Array(0);
+    for (const s of sections) {
+      const encoded = encoder.encode(s.content);
+      const merged = new Uint8Array(allBytes.length + encoded.length);
+      merged.set(allBytes);
+      merged.set(encoded, allBytes.length);
+      allBytes = merged;
+    }
+    const hashBuffer = await crypto.subtle.digest('SHA-256', allBytes);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+};
+
+
+/* ================================================================
+   Demo File — embedded example
+   ================================================================ */
+const DEMO_PFM = `#!PFM/1.0
+#@meta
+id: aa2e0354-578f-4740-bb69-82a18443182b
+agent: claude-code
+model: claude-opus-4-6
+created: 2026-02-16T20:02:37.085863+00:00
+checksum: 049dcea084f4b095226b78491c11bb10066c7bb7aa6e1f1be777a31beea2f782
+tags: example,demo
+version: 1.0
+#@index
+content 329 398
+chain 735 330
+tools 1073 188
+metrics 1271 110
+#@content
+# Analysis Report
+
+The codebase follows a clean MVC architecture with the following key findings:
+
+1. Authentication is handled via JWT tokens with 24h expiry
+2. Database queries use parameterized statements (no SQL injection risk)
+3. Rate limiting is configured at 100 req/min per API key
+4. CORS is properly restricted to known origins
+
+Recommendation: Add request signing for webhook endpoints.
+#@chain
+User: Analyze this codebase for security issues and architecture patterns.
+
+Agent: I'll examine the project structure, authentication flow, database layer,
+and API configuration.
+
+[Searched: auth/*.py, db/*.py, api/middleware.py]
+[Read: 12 files, 3,400 lines]
+[Tools: grep for SQL queries, checked CORS headers, traced auth flow]
+#@tools
+grep(pattern="SELECT|INSERT|UPDATE|DELETE", path="db/")
+read_file("api/middleware.py")
+read_file("auth/jwt_handler.py")
+read_file("config/cors.py")
+grep(pattern="rate_limit", path="api/")
+#@metrics
+tokens_in: 12450
+tokens_out: 3200
+latency_ms: 8934
+model_cost_usd: 0.0847
+files_read: 12
+lines_analyzed: 3400
+#!END`;
+
+
+/* ================================================================
+   Application State
+   ================================================================ */
+let state = {
+  doc: null,
+  filename: '',
+  activeIndex: -1,
+  filteredSections: [],
+  wordWrap: true,
+  checksumValid: false
+};
+
+
+/* ================================================================
+   DOM Refs
+   ================================================================ */
+const $ = id => document.getElementById(id);
+const landing   = $('landing');
+const viewer    = $('viewer');
+const dropZone  = $('drop-zone');
+const fileInput = $('file-input');
+
+
+/* ================================================================
+   File Loading
+   ================================================================ */
+// Maximum file size for client-side parsing (50 MB)
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
+
+function handleFile(file) {
+  if (!file) return;
+  // Validate file size to prevent browser memory exhaustion
+  if (file.size > MAX_FILE_SIZE) {
+    alert('File too large. Maximum size is 50 MB.');
+    return;
+  }
+  // Validate file extension
+  if (!file.name.toLowerCase().endsWith('.pfm')) {
+    alert('Please select a .pfm file.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onerror = function() {
+    alert('Error reading file.');
+  };
+  reader.onload = e => loadPFM(e.target.result, file.name);
+  reader.readAsText(file, 'utf-8');
+}
+
+function loadPFM(text, filename) {
+  const doc = PFMParser.parse(text);
+  state.doc = doc;
+  state.filename = filename || 'untitled.pfm';
+  state.filteredSections = [...doc.sections];
+  state.activeIndex = doc.sections.length > 0 ? 0 : -1;
+
+  // Async checksum validation
+  PFMParser.checksum(doc.sections).then(computed => {
+    state.checksumValid = (computed === (doc.meta.checksum || ''));
+    renderChecksumBadge();
+  });
+
+  showViewer();
+  render();
+}
+
+function loadDemo() {
+  loadPFM(DEMO_PFM, 'hello.pfm');
+}
+
+
+/* ================================================================
+   Screen Switching
+   ================================================================ */
+function showViewer() {
+  landing.classList.add('hidden');
+  viewer.classList.add('active');
+}
+
+function showLanding() {
+  viewer.classList.remove('active');
+  landing.classList.remove('hidden');
+}
+
+
+/* ================================================================
+   Rendering
+   ================================================================ */
+function render() {
+  renderFilename();
+  renderMeta();
+  renderSectionList();
+  renderContent();
+  renderChecksumBadge();
+}
+
+function renderFilename() {
+  $('v-filename').textContent = state.filename;
+}
+
+function renderChecksumBadge() {
+  const badge = $('v-checksum-badge');
+  if (state.checksumValid) {
+    badge.textContent = 'VALID';
+    badge.className = 'badge valid';
+  } else {
+    badge.textContent = 'INVALID';
+    badge.className = 'badge invalid';
+  }
+}
+
+function renderMeta() {
+  const meta = state.doc.meta;
+  const keys = Object.keys(meta);
+  $('meta-count').textContent = keys.length + ' fields';
+
+  // Build meta display using safe DOM methods instead of innerHTML
+  const container = document.createElement('div');
+  container.className = 'meta-grid';
+  for (const key of keys) {
+    // Skip prototype pollution keys
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+    if (!Object.prototype.hasOwnProperty.call(meta, key)) continue;
+
+    const val = meta[key];
+    const display = (key === 'checksum' && val.length > 20) ? val.substring(0, 16) + '...' : val;
+
+    const row = document.createElement('div');
+    row.className = 'meta-row';
+
+    const keyDiv = document.createElement('div');
+    keyDiv.className = 'meta-key';
+    keyDiv.textContent = key;
+
+    const valDiv = document.createElement('div');
+    valDiv.className = 'meta-val';
+    valDiv.textContent = display;
+    valDiv.title = val;
+
+    row.appendChild(keyDiv);
+    row.appendChild(valDiv);
+    container.appendChild(row);
+  }
+  const metaEl = $('v-meta');
+  metaEl.innerHTML = '';
+  metaEl.appendChild(container);
+}
+
+function renderSectionList() {
+  const el = $('v-section-list');
+  let html = '';
+  for (let i = 0; i < state.filteredSections.length; i++) {
+    const s = state.filteredSections[i];
+    const bytes = new TextEncoder().encode(s.content).length;
+    const sizeStr = bytes >= 1024 ? (bytes / 1024).toFixed(1) + ' KB' : bytes + ' B';
+    const cls = i === state.activeIndex ? ' active' : '';
+    html += `<div class="section-item${cls}" data-idx="${i}">` +
+            `<span class="section-item-name">${esc(s.name)}</span>` +
+            `<span class="section-item-size">${sizeStr}</span></div>`;
+  }
+  el.innerHTML = html;
+
+  // Click handlers
+  el.querySelectorAll('.section-item').forEach(item => {
+    item.addEventListener('click', () => {
+      selectSection(parseInt(item.dataset.idx, 10));
+    });
+  });
+}
+
+function renderContent() {
+  const body = $('v-content-body');
+  if (state.activeIndex < 0 || state.activeIndex >= state.filteredSections.length) {
+    body.innerHTML = '<div class="content-empty">Select a section from the sidebar</div>';
+    $('v-content-title').textContent = 'Select a section';
+    $('v-content-meta').textContent = '';
+    return;
+  }
+
+  const s = state.filteredSections[state.activeIndex];
+  $('v-content-title').textContent = s.name;
+
+  const bytes = new TextEncoder().encode(s.content).length;
+  const lines = s.content.split('\n').length;
+  $('v-content-meta').textContent = `${lines} lines \u00b7 ${formatBytes(bytes)}`;
+
+  // Render with line numbers
+  const contentLines = s.content.split('\n');
+  const nums = contentLines.map((_, i) => i + 1).join('\n');
+  const wrapClass = state.wordWrap ? ' wrap' : '';
+
+  body.innerHTML = `<div class="code-container"><pre class="line-numbers">${nums}</pre><pre class="content-pre${wrapClass}">${esc(s.content)}</pre></div>`;
+}
+
+function selectSection(idx) {
+  if (idx < 0 || idx >= state.filteredSections.length) return;
+  state.activeIndex = idx;
+  renderSectionList();
+  renderContent();
+}
+
+function moveSection(delta) {
+  const next = state.activeIndex + delta;
+  if (next >= 0 && next < state.filteredSections.length) {
+    selectSection(next);
+    // Scroll active item into view
+    const active = document.querySelector('.section-item.active');
+    if (active) active.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+
+/* ================================================================
+   Search / Filter
+   ================================================================ */
+$('v-search').addEventListener('input', function() {
+  const q = this.value.toLowerCase().trim();
+  if (!q) {
+    state.filteredSections = [...state.doc.sections];
+  } else {
+    state.filteredSections = state.doc.sections.filter(s =>
+      s.name.toLowerCase().includes(q) || s.content.toLowerCase().includes(q)
+    );
+  }
+  state.activeIndex = state.filteredSections.length > 0 ? 0 : -1;
+  renderSectionList();
+  renderContent();
+});
+
+
+/* ================================================================
+   Export
+   ================================================================ */
+function exportJSON() {
+  if (!state.doc) return;
+  const data = {
+    pfm_version: state.doc.formatVersion,
+    meta: state.doc.meta,
+    sections: state.doc.sections.map(s => ({ name: s.name, content: s.content }))
+  };
+  download(JSON.stringify(data, null, 2), state.filename.replace('.pfm', '.json'), 'application/json');
+}
+
+function exportMarkdown() {
+  if (!state.doc) return;
+  let md = '---\n';
+  for (const [k, v] of Object.entries(state.doc.meta)) md += `${k}: ${v}\n`;
+  md += '---\n\n';
+  for (const s of state.doc.sections) md += `## ${s.name}\n\n${s.content}\n\n`;
+  download(md, state.filename.replace('.pfm', '.md'), 'text/markdown');
+}
+
+function sanitizeFilename(name) {
+  // Strip path separators and dangerous characters
+  return name.replace(/[\/\\:*?"<>|]/g, '_').replace(/\.\./g, '_');
+}
+
+function download(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = sanitizeFilename(filename);
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+
+/* ================================================================
+   Theme
+   ================================================================ */
+function toggleTheme() {
+  document.body.classList.toggle('light');
+  localStorage.setItem('pfm-theme', document.body.classList.contains('light') ? 'light' : 'dark');
+}
+
+// Restore theme preference
+if (localStorage.getItem('pfm-theme') === 'light') {
+  document.body.classList.add('light');
+}
+
+
+/* ================================================================
+   Word Wrap
+   ================================================================ */
+function toggleWrap() {
+  state.wordWrap = !state.wordWrap;
+  $('btn-wrap').classList.toggle('active', state.wordWrap);
+  const pre = document.querySelector('.content-pre');
+  if (pre) pre.classList.toggle('wrap', state.wordWrap);
+}
+
+
+/* ================================================================
+   Shortcuts Modal
+   ================================================================ */
+function openShortcuts() {
+  $('shortcuts-modal').style.display = 'flex';
+}
+function closeShortcuts() {
+  $('shortcuts-modal').style.display = 'none';
+}
+
+
+/* ================================================================
+   Meta Section Toggle
+   ================================================================ */
+let metaOpen = true;
+$('meta-toggle').addEventListener('click', () => {
+  metaOpen = !metaOpen;
+  $('v-meta').style.display = metaOpen ? '' : 'none';
+});
+
+
+/* ================================================================
+   Event Listeners
+   ================================================================ */
+
+// Drag & drop
+['dragenter', 'dragover'].forEach(evt => {
+  dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+});
+['dragleave', 'drop'].forEach(evt => {
+  dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+});
+dropZone.addEventListener('drop', e => {
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+
+// Also support drag anywhere on landing
+landing.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+landing.addEventListener('dragleave', e => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+landing.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+
+// File input
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+// Demo
+$('demo-btn').addEventListener('click', loadDemo);
+
+// Topbar buttons
+$('btn-export-json').addEventListener('click', exportJSON);
+$('btn-export-md').addEventListener('click', exportMarkdown);
+$('btn-theme').addEventListener('click', toggleTheme);
+$('btn-wrap').addEventListener('click', toggleWrap);
+$('btn-shortcuts').addEventListener('click', openShortcuts);
+$('btn-open-new').addEventListener('click', () => {
+  // Create a temporary file input
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pfm';
+  input.onchange = e => handleFile(e.target.files[0]);
+  input.click();
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  const target = e.target;
+  const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+
+  // Escape always works
+  if (e.key === 'Escape') {
+    closeShortcuts();
+    if (isInput) {
+      target.blur();
+      if (target.id === 'v-search') {
+        target.value = '';
+        target.dispatchEvent(new Event('input'));
+      }
+    }
+    return;
+  }
+
+  // Don't handle shortcuts when typing in input
+  if (isInput) return;
+
+  // Only in viewer mode
+  if (!viewer.classList.contains('active')) return;
+
+  switch (e.key) {
+    case 'j':
+    case 'ArrowDown':
+      e.preventDefault();
+      moveSection(1);
+      break;
+    case 'k':
+    case 'ArrowUp':
+      e.preventDefault();
+      moveSection(-1);
+      break;
+    case '/':
+      e.preventDefault();
+      $('v-search').focus();
+      break;
+    case 'w':
+      toggleWrap();
+      break;
+    case 't':
+      toggleTheme();
+      break;
+    case 'o':
+      $('btn-open-new').click();
+      break;
+    case '?':
+      openShortcuts();
+      break;
+  }
+});
+
+// Also handle drag onto viewer
+viewer.addEventListener('dragover', e => e.preventDefault());
+viewer.addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+
+
+/* ================================================================
+   Utilities
+   ================================================================ */
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+
+/* ================================================================
+   Copy Install Command
+   ================================================================ */
+function copyInstall(el, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    el.classList.add('copied');
+    setTimeout(() => el.classList.remove('copied'), 1500);
+  });
+}
+
+
+/* ================================================================
+   URL Hash — load demo if #demo
+   ================================================================ */
+if (window.location.hash === '#demo') {
+  loadDemo();
+}
+</script>
+</body>
+</html>
