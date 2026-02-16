@@ -106,9 +106,10 @@ class PFMReader:
         while i < len(lines):
             line = lines[i]
 
-            # Magic line
+            # Magic line (handles both "#!PFM/1.0" and "#!PFM/1.0:STREAM")
             if line.startswith(MAGIC):
-                doc.format_version = line.split("/", 1)[1] if "/" in line else "1.0"
+                version_part = line.split("/", 1)[1] if "/" in line else "1.0"
+                doc.format_version = version_part.split(":")[0]  # Strip :STREAM flag
                 i += 1
                 continue
 
@@ -119,7 +120,8 @@ class PFMReader:
             # Section header
             if line.startswith(SECTION_PREFIX):
                 # Flush previous section
-                if current_section and current_section not in ("meta", "index"):
+                skip_sections = ("meta", "index", "index:trailing")
+                if current_section and current_section not in skip_sections:
                     content = "\n".join(section_lines)
                     # Strip trailing newline that writer adds
                     if content.endswith("\n"):
@@ -130,7 +132,7 @@ class PFMReader:
                 current_section = section_name
                 section_lines = []
                 in_meta = section_name == "meta"
-                in_index = section_name == "index"
+                in_index = section_name in ("index", "index:trailing")
                 i += 1
                 continue
 
@@ -164,7 +166,7 @@ class PFMReader:
             i += 1
 
         # Flush last section
-        if current_section and current_section not in ("meta", "index"):
+        if current_section and current_section not in ("meta", "index", "index:trailing"):
             content = "\n".join(section_lines)
             if content.endswith("\n"):
                 content = content[:-1]
@@ -202,9 +204,14 @@ class PFMReaderHandle:
         self.format_version: str = ""
 
     def _parse_header(self) -> None:
-        """Parse magic, meta, and index sections only."""
+        """Parse magic, meta, and index sections.
+
+        Handles both inline index (standard) and trailing index (stream mode).
+        For stream files, scans from the EOF marker backward to find the index.
+        """
         text = self._raw.decode("utf-8")
         lines = text.split("\n")
+        is_stream = False
 
         current_section: str | None = None
         i = 0
@@ -212,15 +219,17 @@ class PFMReaderHandle:
             line = lines[i]
 
             if line.startswith(MAGIC):
-                self.format_version = line.split("/", 1)[1] if "/" in line else "1.0"
+                version_part = line.split("/", 1)[1] if "/" in line else "1.0"
+                self.format_version = version_part.split(":")[0]
+                is_stream = ":STREAM" in line
                 i += 1
                 continue
 
             if line.startswith(SECTION_PREFIX):
                 section_name = line[len(SECTION_PREFIX):]
                 current_section = section_name
-                # Stop after index - don't scan content sections
-                if current_section not in ("meta", "index"):
+                # Stop after inline index - don't scan content sections
+                if current_section not in ("meta", "index", "index:trailing"):
                     break
                 i += 1
                 continue
@@ -229,13 +238,38 @@ class PFMReaderHandle:
                 key, val = line.split(": ", 1)
                 self.meta[key.strip()] = val.strip()
 
-            if current_section == "index":
+            if current_section in ("index", "index:trailing"):
                 parts = line.strip().split()
-                if len(parts) == 3:
+                if len(parts) == 3 and parts[0] != "checksum":
                     name, offset, length = parts
                     self.index.add(name, int(offset), int(length))
 
             i += 1
+
+        # If stream mode and no index found yet, scan from the end
+        if is_stream and not self.index.entries:
+            self._parse_trailing_index(lines)
+
+    def _parse_trailing_index(self, lines: list[str]) -> None:
+        """Parse trailing index from the end of a stream-mode file."""
+        in_index = False
+        for line in reversed(lines):
+            if line.startswith(EOF_MARKER):
+                continue
+            if line.startswith(f"{SECTION_PREFIX}index:trailing"):
+                break  # Found the start of trailing index, we're done
+            if line.strip() == "":
+                continue
+            parts = line.strip().split()
+            if len(parts) == 3 and parts[0] != "checksum":
+                try:
+                    name, offset, length = parts[0], int(parts[1]), int(parts[2])
+                    self.index.add(name, offset, length)
+                    in_index = True
+                except ValueError:
+                    continue
+            elif len(parts) == 2 and parts[0] == "checksum":
+                self.meta["checksum"] = parts[1]
 
     def get_section(self, name: str) -> str | None:
         """O(1) indexed access to a section's content. Seeks directly by byte offset."""

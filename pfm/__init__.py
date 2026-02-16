@@ -12,3 +12,4 @@ from pfm.spec import MAGIC, FORMAT_VERSION, SECTION_TYPES
 from pfm.writer import PFMWriter
 from pfm.reader import PFMReader
 from pfm.document import PFMDocument
+from pfm.stream import PFMStreamWriter
