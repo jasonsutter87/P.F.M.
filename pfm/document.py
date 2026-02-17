@@ -79,7 +79,7 @@ class PFMDocument:
         )
 
     # Reserved names that cannot be used as content section names
-    _RESERVED_SECTION_NAMES = frozenset({"meta", "index", "index:trailing"})
+    _RESERVED_SECTION_NAMES = frozenset({"meta", "index", "index-trailing"})
 
     def add_section(self, name: str, content: str) -> PFMSection:
         """Add a named section. Returns the section for chaining.

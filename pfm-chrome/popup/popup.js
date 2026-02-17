@@ -37,7 +37,10 @@
         'claude.ai',
         'gemini.google.com'
       ];
-      const isSupported = supported.some(host => url.includes(host));
+      const isSupported = supported.some(host => {
+        try { return new URL(url).hostname === host; }
+        catch (_) { return false; }
+      });
 
       if (!isSupported) {
         throw new Error('Navigate to ChatGPT, Claude, or Gemini first');

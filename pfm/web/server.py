@@ -15,6 +15,7 @@ Security:
 
 from __future__ import annotations
 
+import re
 import sys
 import threading
 import webbrowser
@@ -37,6 +38,7 @@ class _PFMHandler(BaseHTTPRequestHandler):
     """
 
     _html_content: str = ""
+    _csp_nonce: str = ""
 
     def do_GET(self) -> None:
         # Only serve the root path -- reject all other paths
@@ -55,7 +57,8 @@ class _PFMHandler(BaseHTTPRequestHandler):
         self.send_header("X-Frame-Options", "DENY")
         self.send_header(
             "Content-Security-Policy",
-            "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:;"
+            f"default-src 'none'; script-src 'nonce-{self._csp_nonce}'; "
+            f"style-src 'nonce-{self._csp_nonce}'; img-src data:;"
         )
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("X-XSS-Protection", "1; mode=block")
@@ -113,8 +116,15 @@ def serve(pfm_path: str | Path, port: int = 0, open_browser: bool = True) -> Non
 
     html_content = generate_html(pfm_path)
 
+    # Extract nonce from the generated HTML for the HTTP CSP header
+    nonce_match = re.search(r"nonce-([A-Za-z0-9_-]+)", html_content)
+    csp_nonce = nonce_match.group(1) if nonce_match else ""
+
     # Create handler class with the HTML content bound
-    handler = type("Handler", (_PFMHandler,), {"_html_content": html_content})
+    handler = type("Handler", (_PFMHandler,), {
+        "_html_content": html_content,
+        "_csp_nonce": csp_nonce,
+    })
 
     server = HTTPServer(("127.0.0.1", port), handler)
     actual_port = server.server_address[1]

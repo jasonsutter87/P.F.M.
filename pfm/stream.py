@@ -14,7 +14,7 @@ Design:
     search("query")
     #@chain
     ...
-    #@index:trailing               <- Index written on close (or crash recovery)
+    #@index-trailing               <- Index written on close (or crash recovery)
     content 85 28
     tools 121 16
     chain 145 20
@@ -42,9 +42,9 @@ Usage:
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import os
+import platform
 import shutil
 import uuid
 from datetime import datetime, timezone
@@ -55,6 +55,9 @@ from pfm.spec import (
     MAX_FILE_SIZE, MAX_SECTIONS, MAX_SECTION_NAME_LENGTH,
     ALLOWED_SECTION_NAME_CHARS, escape_content, unescape_content,
 )
+
+# Reserved section names (matches PFMDocument._RESERVED_SECTION_NAMES)
+_RESERVED_SECTION_NAMES = frozenset({"meta", "index", "index-trailing"})
 
 
 class PFMStreamWriter:
@@ -75,6 +78,7 @@ class PFMStreamWriter:
         self._sections: list[tuple[str, int, int]] = []  # (name, offset, length)
         self._checksum = hashlib.sha256()
         self._closed = False
+        self._final_size: int = 0
 
         if append and self.path.exists():
             self._handle, self._sections = _recover(self.path)
@@ -144,6 +148,8 @@ class PFMStreamWriter:
                 f"Invalid section name: {name!r}. "
                 f"Only lowercase alphanumeric, hyphens, and underscores allowed."
             )
+        if name in _RESERVED_SECTION_NAMES:
+            raise ValueError(f"Reserved section name: {name!r}")
 
         # Enforce section count limit
         if len(self._sections) >= MAX_SECTIONS:
@@ -188,7 +194,7 @@ class PFMStreamWriter:
 
         # Write trailing index
         index_offset = self._handle.tell()
-        self._write(f"{SECTION_PREFIX}index:trailing\n")
+        self._write(f"{SECTION_PREFIX}index-trailing\n")
         for name, offset, length in self._sections:
             self._write(f"{name} {offset} {length}\n")
 
@@ -200,6 +206,7 @@ class PFMStreamWriter:
 
         self._handle.flush()
         os.fsync(self._handle.fileno())
+        self._final_size = self._handle.tell()
         self._handle.close()
         self._closed = True
 
@@ -218,7 +225,17 @@ class PFMStreamWriter:
 
     @property
     def bytes_written(self) -> int:
-        return self._handle.tell() if not self._closed else self.path.stat().st_size
+        return self._handle.tell() if not self._closed else self._final_size
+
+
+def _lock_file(handle) -> None:
+    """Acquire an exclusive non-blocking file lock (cross-platform)."""
+    if platform.system() == "Windows":
+        import msvcrt
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
 
 def _recover(path: Path) -> tuple:
@@ -265,7 +282,7 @@ def _recover(path: Path) -> tuple:
             section_tag = line[len(SECTION_PREFIX):]
 
             # Skip meta, index, and trailing index
-            if section_tag in ("meta", "index", "index:trailing"):
+            if section_tag in ("meta", "index", "index-trailing"):
                 current_section_name = None
             else:
                 current_section_name = section_tag
@@ -289,7 +306,7 @@ def _recover(path: Path) -> tuple:
     # Strip any trailing index/EOF for appending
     # PFM-004 fix: Use rfind to find the LAST occurrence, not the first
     truncate_at = len(raw)
-    trailing_marker = f"{SECTION_PREFIX}index:trailing"
+    trailing_marker = f"{SECTION_PREFIX}index-trailing"
     # Search from end of file for trailing index marker
     rpos = text.rfind(trailing_marker)
     if rpos >= 0:
@@ -303,7 +320,7 @@ def _recover(path: Path) -> tuple:
     handle = open(path, "r+b")
     # PFM-008/Stream: Acquire exclusive lock to prevent TOCTOU race conditions
     try:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        _lock_file(handle)
     except (OSError, IOError):
         handle.close()
         raise RuntimeError(

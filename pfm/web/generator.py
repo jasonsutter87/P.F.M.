@@ -6,6 +6,7 @@ Zero dependencies. The generated HTML embeds all data, CSS, and JS inline.
 from __future__ import annotations
 
 import json
+import secrets
 from pathlib import Path
 
 from pfm.reader import PFMReader
@@ -45,7 +46,10 @@ def generate_html(pfm_path: str | Path) -> str:
     data_json = data_json.replace("</", "<\\/")
     data_json = data_json.replace("<!--", "<\\!--")
 
-    return _HTML_TEMPLATE.replace("__PFM_DATA_PLACEHOLDER__", data_json)
+    nonce = secrets.token_urlsafe(16)
+    html = _HTML_TEMPLATE.replace("__PFM_DATA_PLACEHOLDER__", data_json)
+    html = html.replace("__NONCE__", nonce)
+    return html
 
 
 def write_html(pfm_path: str | Path, output_path: str | Path) -> int:
@@ -71,9 +75,9 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-__NONCE__'; style-src 'nonce-__NONCE__'; img-src data:;">
 <title>PFM Viewer</title>
-<style>
+<style nonce="__NONCE__">
 :root {
   --bg: #1e1e1e;
   --bg-sidebar: #252526;
@@ -290,9 +294,9 @@ body {
   </div>
   <div class="section-list" id="section-list"></div>
   <div class="toolbar">
-    <button onclick="exportJSON()">Export JSON</button>
-    <button onclick="exportMarkdown()">Export Markdown</button>
-    <button onclick="toggleTheme()">Toggle Theme</button>
+    <button id="btn-json">Export JSON</button>
+    <button id="btn-md">Export Markdown</button>
+    <button id="btn-theme">Toggle Theme</button>
   </div>
 </div>
 <div class="main">
@@ -304,7 +308,7 @@ body {
   </div>
 </div>
 
-<script>
+<script nonce="__NONCE__">
 const PFM = __PFM_DATA_PLACEHOLDER__;
 
 // --- Render ---
@@ -339,6 +343,11 @@ function init() {
     if (e.key === 'j') moveSelection(1);
     if (e.key === 'k') moveSelection(-1);
   });
+
+  // Toolbar buttons (nonce-compatible — no inline handlers)
+  document.getElementById('btn-json').addEventListener('click', exportJSON);
+  document.getElementById('btn-md').addEventListener('click', exportMarkdown);
+  document.getElementById('btn-theme').addEventListener('click', toggleTheme);
 }
 
 function renderMeta() {

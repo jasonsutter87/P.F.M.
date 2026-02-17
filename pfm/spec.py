@@ -36,6 +36,13 @@ Content Escaping:
     - Only affects lines starting with #@ or #! (minimal overhead)
     - Human-readable: the backslash is visually obvious
 
+Checksum Protocol:
+    - The checksum covers UNESCAPED section content (original text, not the on-disk escaped form)
+    - Each section's content is UTF-8 encoded and fed into SHA-256 in document order
+    - Trailing newlines added by the writer for format correctness are stripped before hashing
+    - The checksum value is stored in the meta section as "checksum: <hex>"
+    - For stream-mode files, the checksum is stored in the trailing index block
+
 Priority: Speed > Indexing > Human Readability > AI Usefulness
 """
 
@@ -137,10 +144,3 @@ def escape_content(content: str) -> str:
 def unescape_content(content: str) -> str:
     """Unescape all lines in a content string."""
     return "\n".join(unescape_content_line(line) for line in content.split("\n"))
-
-
-def validate_section_name(name: str) -> bool:
-    """Validate a section name is safe."""
-    if not name or len(name) > MAX_SECTION_NAME_LENGTH:
-        return False
-    return all(c in ALLOWED_SECTION_NAME_CHARS for c in name)

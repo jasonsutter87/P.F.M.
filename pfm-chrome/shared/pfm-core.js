@@ -63,7 +63,7 @@ const PFMParser = {
           continue;
         }
         inMeta = (name === 'meta');
-        inIndex = (name === 'index' || name === 'index:trailing');
+        inIndex = (name === 'index' || name === 'index-trailing');
         if (!inMeta && !inIndex) {
           // Enforce section count limit
           if (doc.sections.length >= this.MAX_SECTIONS) {
@@ -129,19 +129,6 @@ const PFMParser = {
     return rest.startsWith('#@') || rest.startsWith('#!PFM') || rest.startsWith('#!END');
   },
 
-  async checksum(sections) {
-    const encoder = new TextEncoder();
-    let allBytes = new Uint8Array(0);
-    for (const s of sections) {
-      const encoded = encoder.encode(s.content);
-      const merged = new Uint8Array(allBytes.length + encoded.length);
-      merged.set(allBytes);
-      merged.set(encoded, allBytes.length);
-      allBytes = merged;
-    }
-    const hashBuffer = await crypto.subtle.digest('SHA-256', allBytes);
-    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
 };
 
 

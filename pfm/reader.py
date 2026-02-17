@@ -140,7 +140,7 @@ class PFMReader:
             # Section header (only match unescaped — escaped lines start with \#)
             if line.startswith(SECTION_PREFIX):
                 # Flush previous section
-                skip_sections = ("meta", "index", "index:trailing")
+                skip_sections = ("meta", "index", "index-trailing")
                 if current_section and current_section not in skip_sections:
                     content = "\n".join(section_lines)
                     # Strip trailing newline that writer adds
@@ -154,7 +154,7 @@ class PFMReader:
                 current_section = section_name
                 section_lines = []
                 in_meta = section_name == "meta"
-                in_index = section_name in ("index", "index:trailing")
+                in_index = section_name in ("index", "index-trailing")
                 i += 1
                 continue
 
@@ -176,13 +176,8 @@ class PFMReader:
                 i += 1
                 continue
 
-            # Index entries
+            # Index entries (skipped in full parse — index is only used for lazy access)
             if in_index:
-                parts = line.strip().split()
-                if len(parts) == 3:
-                    name, offset, length = parts
-                    # Store in index (not used in full parse, but good to have)
-                    pass
                 i += 1
                 continue
 
@@ -193,7 +188,7 @@ class PFMReader:
             i += 1
 
         # Flush last section
-        if current_section and current_section not in ("meta", "index", "index:trailing"):
+        if current_section and current_section not in ("meta", "index", "index-trailing"):
             content = "\n".join(section_lines)
             if content.endswith("\n"):
                 content = content[:-1]
@@ -275,7 +270,7 @@ class PFMReaderHandle:
                 section_name = line[len(SECTION_PREFIX):]
                 current_section = section_name
                 # Stop at the first content section — header is fully parsed
-                if current_section not in ("meta", "index", "index:trailing"):
+                if current_section not in ("meta", "index", "index-trailing"):
                     break
                 continue
 
@@ -287,12 +282,15 @@ class PFMReaderHandle:
                     continue
                 self.meta[key] = val.strip()
 
-            if current_section in ("index", "index:trailing"):
+            if current_section in ("index", "index-trailing"):
                 parts = line.strip().split()
                 if len(parts) == 3 and parts[0] != "checksum":
-                    name, offset, length = parts
-                    off = int(offset)
-                    ln = int(length)
+                    try:
+                        name, offset, length = parts
+                        off = int(offset)
+                        ln = int(length)
+                    except ValueError:
+                        continue
                     # PFM-008: Validate index bounds
                     if 0 <= off and off + ln <= self._file_size:
                         self.index.add(name, off, ln)
@@ -304,7 +302,7 @@ class PFMReaderHandle:
     def _parse_trailing_index(self) -> None:
         """Parse trailing index from the end of a stream-mode file.
 
-        Reads backward from EOF to find the index:trailing section.
+        Reads backward from EOF to find the index-trailing section.
         """
         # Read the tail of the file (trailing index is typically < 4KB)
         tail_size = min(self._file_size, 64 * 1024)
@@ -315,7 +313,7 @@ class PFMReaderHandle:
         for line in reversed(lines):
             if line.startswith(EOF_MARKER):
                 continue
-            if line.startswith(f"{SECTION_PREFIX}index:trailing"):
+            if line.startswith(f"{SECTION_PREFIX}index-trailing"):
                 break  # Found the start of trailing index, we're done
             if line.strip() == "":
                 continue

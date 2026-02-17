@@ -123,7 +123,7 @@ export function parsePFM(text: string): PFMDocument {
       }
 
       inMeta = name === 'meta';
-      inIndex = name === 'index' || name === 'index:trailing';
+      inIndex = name === 'index' || name === 'index-trailing';
 
       if (!inMeta && !inIndex) {
         // Enforce section count limit

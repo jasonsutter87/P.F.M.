@@ -27,7 +27,7 @@ class TestStreamWriter:
         assert "#!PFM/1.0:STREAM" in raw
         assert "#@content" in raw
         assert "#@chain" in raw
-        assert "#@index:trailing" in raw
+        assert "#@index-trailing" in raw
         assert "#!END:" in raw
 
         Path(path).unlink()
