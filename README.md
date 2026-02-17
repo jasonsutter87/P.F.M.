@@ -294,12 +294,12 @@ pfm/
 │   ├── viewer/                 # Full-tab .pfm viewer
 │   └── shared/                 # PFM core (parser, serializer, converters)
 ├── docs/                       # GitHub Pages SPA (viewer & converter)
-├── tests/                      # 101 Python tests
+├── tests/                      # 123 Python tests + conformance vectors
 └── examples/
     └── hello.pfm               # Example file
 ```
 
-**101 Python tests. 30 JS tests. All passing.**
+**123 Python tests. 55 JS tests. 178 total. All passing.**
 
 ---
 

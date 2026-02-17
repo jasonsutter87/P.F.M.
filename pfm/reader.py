@@ -281,7 +281,11 @@ class PFMReaderHandle:
 
             if current_section == "meta" and ": " in line:
                 key, val = line.split(": ", 1)
-                self.meta[key.strip()] = val.strip()
+                key = key.strip()
+                # Enforce meta field count limit (PFM-014: prevents DoS from crafted files)
+                if key not in self.meta and len(self.meta) >= MAX_META_FIELDS:
+                    continue
+                self.meta[key] = val.strip()
 
             if current_section in ("index", "index:trailing"):
                 parts = line.strip().split()

@@ -49,20 +49,6 @@ export async function serialize(doc: PFMDocument): Promise<string> {
   const magic = `#!PFM/${doc.formatVersion}${doc.isStream ? ':STREAM' : ''}\n`;
   const meta = buildMeta({ ...doc.meta, checksum });
 
-  // Iteratively calculate offsets (converges in <=3 passes)
-  let index = '';
-  let headerLen = encoder.encode(magic + meta).length;
-
-  for (let pass = 0; pass < 4; pass++) {
-    index = buildIndex(escaped, headerLen + encoder.encode(`#@index\n${index}`).length);
-    const fullHeader = magic + meta + `#@index\n${index}`;
-    const newHeaderLen = encoder.encode(fullHeader).length;
-    if (newHeaderLen === headerLen + encoder.encode(`#@index\n${index}`).length - encoder.encode(`#@index\n${index}`).length + encoder.encode(`#@index\n${index}`).length) {
-      // Already stable
-    }
-    headerLen = encoder.encode(magic + meta).length;
-  }
-
   // Final assembly with correct offsets
   const headerWithoutIndex = magic + meta;
   const headerBytes = encoder.encode(headerWithoutIndex).length;

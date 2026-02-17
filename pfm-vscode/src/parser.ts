@@ -85,6 +85,7 @@ export function parsePFM(text: string): PFMDocument {
   let sectionContentStart = -1;
   let inMeta = false;
   let inIndex = false;
+  let metaFieldCount = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -118,7 +119,6 @@ export function parsePFM(text: string): PFMDocument {
       // Validate section name length
       if (name.length > MAX_SECTION_NAME_LENGTH) {
         currentSection = null;
-        i++;
         continue;
       }
 
@@ -129,7 +129,6 @@ export function parsePFM(text: string): PFMDocument {
         // Enforce section count limit
         if (doc.sections.length >= MAX_SECTIONS) {
           currentSection = null;
-          i++;
           continue;
         }
         currentSection = name;
@@ -148,9 +147,10 @@ export function parsePFM(text: string): PFMDocument {
       if (sepIdx !== -1) {
         const key = line.substring(0, sepIdx).trim();
         const val = line.substring(sepIdx + 2).trim();
-        // Prevent prototype pollution and enforce field count limit
-        if (!FORBIDDEN_KEYS.has(key) && Object.keys(doc.meta).length < MAX_META_FIELDS) {
+        // Prevent prototype pollution and enforce field count limit (O(1) check)
+        if (!FORBIDDEN_KEYS.has(key) && metaFieldCount < MAX_META_FIELDS) {
           doc.meta[key] = val;
+          metaFieldCount++;
         }
       }
       continue;
