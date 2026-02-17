@@ -99,6 +99,15 @@ export async function serialize(doc: PFMDocument): Promise<string> {
   return result;
 }
 
+/**
+ * Sanitize a meta value: strip control characters to prevent format injection.
+ * A newline in a meta value would break PFM format parsing.
+ */
+function sanitizeMeta(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  return value.replace(/[\x00-\x1f\x7f]/g, ' ');
+}
+
 /** Build the #@meta section text. */
 function buildMeta(meta: Record<string, string | undefined>): string {
   let text = '#@meta\n';
@@ -106,13 +115,13 @@ function buildMeta(meta: Record<string, string | undefined>): string {
   const order = ['id', 'agent', 'model', 'created', 'checksum', 'parent', 'tags', 'version'];
   for (const key of order) {
     if (meta[key]) {
-      text += `${key}: ${meta[key]}\n`;
+      text += `${sanitizeMeta(key)}: ${sanitizeMeta(meta[key]!)}\n`;
     }
   }
   // Custom fields
   for (const [key, val] of Object.entries(meta)) {
     if (!order.includes(key) && val) {
-      text += `${key}: ${val}\n`;
+      text += `${sanitizeMeta(key)}: ${sanitizeMeta(val)}\n`;
     }
   }
   return text;

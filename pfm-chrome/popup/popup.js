@@ -66,12 +66,15 @@
         sections.push({ name: 'summary', content: summary });
       }
 
+      // Sanitize URL and title to prevent format injection (matching content-main.js)
+      const safeUrl = url.replace(/[\x00-\x1f]/g, '');
+      const safeTitle = (result.title || '').replace(/[\x00-\x1f]/g, '').substring(0, 200);
       const meta = {
         agent: result.model || result.platform,
         model: result.model,
         source_platform: result.platform,
-        source_url: url,
-        title: result.title,
+        source_url: safeUrl,
+        title: safeTitle,
         tags: 'ai-conversation,' + result.platform
       };
 

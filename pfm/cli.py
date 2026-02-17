@@ -33,8 +33,18 @@ def cmd_create(args: argparse.Namespace) -> None:
     elif args.file:
         # PFM-005/CLI: Resolve path and reject traversal attempts
         file_path = Path(args.file).resolve()
+        cwd = Path.cwd().resolve()
         if ".." in Path(args.file).parts:
             print("Error: Path traversal (..) not allowed in --file", file=sys.stderr)
+            sys.exit(1)
+        # Ensure resolved path is under the current working directory
+        try:
+            file_path.relative_to(cwd)
+        except ValueError:
+            print("Error: --file must reference a path under the current directory", file=sys.stderr)
+            sys.exit(1)
+        if not file_path.is_file():
+            print(f"Error: File not found: {args.file}", file=sys.stderr)
             sys.exit(1)
         content = file_path.read_text(encoding="utf-8")
     elif not sys.stdin.isatty():
@@ -128,10 +138,22 @@ def cmd_convert(args: argparse.Namespace) -> None:
     """Convert to/from PFM."""
     from pfm.reader import PFMReader
     from pfm.converters import convert_to, convert_from
+    from pfm.spec import MAX_FILE_SIZE
 
     if args.direction == "from":
         # Convert other format -> PFM
-        data = Path(args.input).read_text(encoding="utf-8")
+        input_path = Path(args.input)
+        if not input_path.is_file():
+            print(f"Error: File not found: {args.input}", file=sys.stderr)
+            sys.exit(1)
+        file_size = input_path.stat().st_size
+        if file_size > MAX_FILE_SIZE:
+            print(
+                f"Error: File size {file_size} exceeds maximum {MAX_FILE_SIZE} bytes",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        data = input_path.read_text(encoding="utf-8")
         doc = convert_from(data, args.format)
         output = args.output or Path(args.input).stem + ".pfm"
         nbytes = doc.write(output)

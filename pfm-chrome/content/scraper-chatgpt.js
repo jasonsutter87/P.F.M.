@@ -50,6 +50,11 @@ const ScraperChatGPT = {
     return host === 'chat.openai.com' || host === 'chatgpt.com';
   },
 
+  /** Maximum total content size (10 MB) to prevent memory exhaustion */
+  MAX_CONTENT_SIZE: 10 * 1024 * 1024,
+  /** Maximum message count per conversation */
+  MAX_MESSAGES: 5000,
+
   /** Scrape the current conversation */
   scrape() {
     const turns = this.query(document, this.selectors.turnContainer, true);
@@ -58,25 +63,36 @@ const ScraperChatGPT = {
     }
 
     const messages = [];
+    let totalSize = 0;
     for (const turn of turns) {
+      if (messages.length >= this.MAX_MESSAGES) break;
+
       // Determine role
       const userEl = this.query(turn, this.selectors.userMessage, false);
       const assistantEl = this.query(turn, this.selectors.assistantMessage, false);
 
+      let text = '';
+      let role = 'unknown';
       if (userEl) {
-        messages.push({ role: 'user', content: userEl.innerText.trim() });
+        text = userEl.innerText.trim();
+        role = 'user';
       } else if (assistantEl) {
-        messages.push({ role: 'assistant', content: assistantEl.innerText.trim() });
+        text = assistantEl.innerText.trim();
+        role = 'assistant';
       } else {
         // Fallback: try to infer from turn structure
-        const text = turn.innerText.trim();
+        text = turn.innerText.trim();
         if (text) {
-          // Check data attributes for role hints
-          const role = turn.dataset?.messageAuthorRole ||
-                       (turn.querySelector('[data-message-author-role]')?.dataset?.messageAuthorRole) ||
-                       'unknown';
-          messages.push({ role, content: text });
+          role = turn.dataset?.messageAuthorRole ||
+                 (turn.querySelector('[data-message-author-role]')?.dataset?.messageAuthorRole) ||
+                 'unknown';
         }
+      }
+
+      if (text) {
+        totalSize += text.length;
+        if (totalSize > this.MAX_CONTENT_SIZE) break;
+        messages.push({ role, content: text });
       }
     }
 

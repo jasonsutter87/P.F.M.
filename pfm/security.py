@@ -33,12 +33,22 @@ def sign(doc: PFMDocument, secret: str | bytes) -> str:
     Sign a PFM document with HMAC-SHA256.
     Returns the hex signature string.
     Sets doc.custom_meta["signature"] and doc.custom_meta["sig_algo"].
+
+    Always excludes any existing signature/sig_algo from the signing message
+    to ensure sign/verify symmetry (idempotent re-signing).
     """
     if isinstance(secret, str):
         secret = secret.encode("utf-8")
 
-    # Build the message to sign: meta fields + all section contents
-    message = _build_signing_message(doc)
+    # Build the message to sign, excluding any existing sig fields
+    # so that sign() and verify() always use the same message.
+    import copy as _copy
+    doc_copy = _copy.copy(doc)
+    doc_copy.custom_meta = {
+        k: v for k, v in doc.custom_meta.items()
+        if k not in ("signature", "sig_algo")
+    }
+    message = _build_signing_message(doc_copy)
     signature = hmac.new(secret, message, hashlib.sha256).hexdigest()
 
     doc.custom_meta["signature"] = signature
@@ -55,8 +65,8 @@ def verify(doc: PFMDocument, secret: str | bytes, *, require: bool = False) -> b
     If require=True, raises ValueError when no signature is present
     (distinguishes 'never signed' from 'signature stripped').
 
-    PFM-013 fix: Uses a copy of custom_meta instead of mutating the document,
-    ensuring exception-safety and thread-safety.
+    Thread-safe: uses a shallow copy of the document to avoid any mutation
+    of the original during verification.
     """
     stored_sig = doc.custom_meta.get("signature", "")
     if not stored_sig:
@@ -67,18 +77,17 @@ def verify(doc: PFMDocument, secret: str | bytes, *, require: bool = False) -> b
     if isinstance(secret, str):
         secret = secret.encode("utf-8")
 
-    # PFM-013 fix: Build signing message WITHOUT mutating the document.
-    # We temporarily create a filtered view for _build_signing_message.
-    # Save originals, remove from dict for signing, restore in finally block.
-    saved_sig = doc.custom_meta.pop("signature", "")
-    saved_algo = doc.custom_meta.pop("sig_algo", "")
-    try:
-        message = _build_signing_message(doc)
-        expected = hmac.new(secret, message, hashlib.sha256).hexdigest()
-    finally:
-        # Always restore, even if _build_signing_message raises
-        doc.custom_meta["signature"] = saved_sig
-        doc.custom_meta["sig_algo"] = saved_algo
+    # Thread-safe: build signing message from a snapshot that excludes
+    # signature/sig_algo, without ever touching the original dict.
+    from pfm.document import PFMDocument as _Doc
+    import copy as _copy
+    doc_copy = _copy.copy(doc)
+    doc_copy.custom_meta = {
+        k: v for k, v in doc.custom_meta.items()
+        if k not in ("signature", "sig_algo")
+    }
+    message = _build_signing_message(doc_copy)
+    expected = hmac.new(secret, message, hashlib.sha256).hexdigest()
 
     return hmac.compare_digest(stored_sig, expected)
 

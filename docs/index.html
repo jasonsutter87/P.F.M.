@@ -2037,7 +2037,14 @@ function exportJSON() {
 function exportMarkdown() {
   if (!state.doc) return;
   let md = '---\n';
-  for (const [k, v] of Object.entries(state.doc.meta)) md += `${k}: ${String(v).replace(/\n/g, ' ')}\n`;
+  for (const [k, v] of Object.entries(state.doc.meta)) {
+    if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+    if (!Object.prototype.hasOwnProperty.call(state.doc.meta, k)) continue;
+    // Sanitize key and value to prevent YAML frontmatter injection
+    const safeKey = k.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeVal = String(v).replace(/\n/g, ' ').replace(/^---$/gm, '\\---');
+    md += `${safeKey}: ${safeVal}\n`;
+  }
   md += '---\n\n';
   for (const s of state.doc.sections) md += `## ${s.name}\n\n${s.content}\n\n`;
   download(md, state.filename.replace('.pfm', '.md'), 'text/markdown');

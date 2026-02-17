@@ -406,7 +406,10 @@ function exportMarkdown() {
   let md = '---\n';
   for (const k in PFM.meta) {
     if (!Object.prototype.hasOwnProperty.call(PFM.meta, k)) continue;
-    md += k + ': ' + PFM.meta[k] + '\n';
+    // Sanitize key and value to prevent YAML frontmatter injection
+    var safeKey = k.replace(/[\x00-\x1f:]/g, '_');
+    var safeVal = String(PFM.meta[k]).replace(/\n/g, ' ').replace(/^---$/gm, '\\---');
+    md += safeKey + ': ' + safeVal + '\n';
   }
   md += '---\n\n';
   PFM.sections.forEach(function(s) {

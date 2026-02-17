@@ -199,6 +199,8 @@ def to_markdown(doc: PFMDocument) -> str:
     """
     Convert PFM document to Markdown.
     Sections become ## headers, meta becomes a YAML-style frontmatter block.
+
+    Security: Sanitizes meta keys and values to prevent YAML frontmatter injection.
     """
     parts = []
 
@@ -207,7 +209,11 @@ def to_markdown(doc: PFMDocument) -> str:
     if meta:
         parts.append("---")
         for key, val in meta.items():
-            parts.append(f"{key}: {val}")
+            # Sanitize key: remove colons and control characters
+            safe_key = "".join(c if c.isalnum() or c in "-_" else "_" for c in key)
+            # Sanitize value: replace newlines, escape frontmatter delimiters
+            safe_val = val.replace("\n", " ").replace("---", "\\---")
+            parts.append(f"{safe_key}: {safe_val}")
         parts.append("---")
         parts.append("")
 

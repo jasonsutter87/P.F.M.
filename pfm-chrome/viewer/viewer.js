@@ -231,7 +231,15 @@
   function exportMarkdown() {
     if (!state.doc) return;
     let md = '---\n';
-    for (const [k, v] of Object.entries(state.doc.meta)) md += k + ': ' + String(v).replace(/\n/g, ' ') + '\n';
+    for (const [k, v] of Object.entries(state.doc.meta)) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      if (!Object.prototype.hasOwnProperty.call(state.doc.meta, k)) continue;
+      // Sanitize value: replace newlines and escape YAML frontmatter delimiters
+      const safeVal = String(v).replace(/\n/g, ' ').replace(/^---$/gm, '\\---');
+      // Sanitize key: strip colons and control characters
+      const safeKey = k.replace(/[\x00-\x1f:]/g, '_');
+      md += safeKey + ': ' + safeVal + '\n';
+    }
     md += '---\n\n';
     for (const s of state.doc.sections) md += '## ' + s.name + '\n\n' + s.content + '\n\n';
     pfmDownload(md, state.filename.replace('.pfm', '.md'), 'text/markdown');

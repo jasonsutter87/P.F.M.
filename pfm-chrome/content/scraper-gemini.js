@@ -47,12 +47,18 @@ const ScraperGemini = {
     return all ? [] : null;
   },
 
+  /** Maximum total content size (10 MB) to prevent memory exhaustion */
+  MAX_CONTENT_SIZE: 10 * 1024 * 1024,
+  /** Maximum message count per conversation */
+  MAX_MESSAGES: 5000,
+
   detect() {
     return location.hostname === 'gemini.google.com';
   },
 
   scrape() {
     const messages = [];
+    let totalSize = 0;
 
     // Strategy 1: Explicit user/model messages
     const userEls = this.query(document, this.selectors.userMessage, true);
@@ -78,6 +84,9 @@ const ScraperGemini = {
       });
 
       for (const turn of allTurns) {
+        if (messages.length >= this.MAX_MESSAGES) break;
+        totalSize += turn.content.length;
+        if (totalSize > this.MAX_CONTENT_SIZE) break;
         messages.push({ role: turn.role, content: turn.content });
       }
     }
@@ -87,8 +96,11 @@ const ScraperGemini = {
       const turns = this.query(document, this.selectors.turnContainer, true);
       let isUser = true;
       for (const turn of turns) {
+        if (messages.length >= this.MAX_MESSAGES) break;
         const text = turn.innerText.trim();
         if (text) {
+          totalSize += text.length;
+          if (totalSize > this.MAX_CONTENT_SIZE) break;
           messages.push({ role: isUser ? 'user' : 'assistant', content: text });
           isUser = !isUser;
         }

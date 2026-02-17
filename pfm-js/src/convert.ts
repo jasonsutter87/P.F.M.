@@ -97,7 +97,13 @@ export function toMarkdown(doc: PFMDocument): string {
   if (keys.length > 0) {
     parts.push('---');
     for (const key of keys) {
-      if (meta[key]) parts.push(`${key}: ${meta[key]}`);
+      if (meta[key]) {
+        // Sanitize key: only allow alphanumeric, hyphens, underscores
+        const safeKey = key.replace(/[^a-zA-Z0-9_-]/g, '_');
+        // Sanitize value: replace newlines, escape frontmatter delimiters
+        const safeVal = meta[key]!.replace(/\n/g, ' ').replace(/---/g, '\\---');
+        parts.push(`${safeKey}: ${safeVal}`);
+      }
     }
     parts.push('---');
     parts.push('');

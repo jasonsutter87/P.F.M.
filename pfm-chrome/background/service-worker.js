@@ -3,8 +3,11 @@
    Minimal: handles viewer tab opening and lifecycle events.
    ================================================================ */
 
-// Open viewer tab when requested
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+// Open viewer tab when requested (only from our own extension)
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // Validate sender is from our own extension
+  if (!sender.id || sender.id !== chrome.runtime.id) return;
+
   if (msg.action === 'open_viewer') {
     chrome.tabs.create({
       url: chrome.runtime.getURL('viewer/viewer.html')

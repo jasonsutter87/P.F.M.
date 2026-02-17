@@ -87,8 +87,15 @@ class PFMStreamWriter:
             # Position at end, before any trailing index/EOF
             self._handle.seek(0, 2)
         else:
-            self._handle = open(self.path, "wb")
+            # PFM-019/Stream: Use explicit file permissions (0644) matching PFMWriter
+            fd = os.open(str(self.path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+            self._handle = os.fdopen(fd, "wb")
             self._write_header(agent, model, custom_meta)
+
+    @staticmethod
+    def _sanitize_meta(value: str) -> str:
+        """Strip control characters from meta values to prevent format injection."""
+        return "".join(c for c in value if c >= " " and c != "\x7f")
 
     def _write_header(self, agent: str, model: str, custom_meta: dict[str, str]) -> None:
         """Write magic line and meta section."""
@@ -99,12 +106,14 @@ class PFMStreamWriter:
         self._write(f"{SECTION_PREFIX}meta\n")
         self._write(f"id: {doc_id}\n")
         if agent:
-            self._write(f"agent: {agent}\n")
+            self._write(f"agent: {self._sanitize_meta(agent)}\n")
         if model:
-            self._write(f"model: {model}\n")
+            self._write(f"model: {self._sanitize_meta(model)}\n")
         self._write(f"created: {created}\n")
         for key, val in custom_meta.items():
-            self._write(f"{key}: {val}\n")
+            safe_key = self._sanitize_meta(key)
+            safe_val = self._sanitize_meta(val)
+            self._write(f"{safe_key}: {safe_val}\n")
         self._handle.flush()
 
     def write_section(self, name: str, content: str) -> None:
@@ -213,6 +222,13 @@ def _recover(path: Path) -> tuple:
 
     PFM-004 fix: Creates backup before truncation, uses rfind for marker search.
     """
+    # Enforce file size limit before reading into memory
+    file_size = path.stat().st_size
+    if file_size > MAX_FILE_SIZE:
+        raise ValueError(
+            f"File size {file_size} exceeds maximum {MAX_FILE_SIZE} bytes"
+        )
+
     # Create backup before any modifications
     backup_path = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup_path)

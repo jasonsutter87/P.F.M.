@@ -51,7 +51,12 @@ class PFMWriter:
         # Override checksum with freshly computed value
         meta["checksum"] = checksum
         for key, val in meta.items():
-            header.write(f"{key}: {val}\n".encode("utf-8"))
+            # Sanitize meta values: strip newlines and control characters
+            # to prevent format injection (a newline in a value could create
+            # fake section headers or EOF markers)
+            safe_key = "".join(c for c in key if c >= " " and c != "\x7f")
+            safe_val = "".join(c for c in val if c >= " " and c != "\x7f")
+            header.write(f"{safe_key}: {safe_val}\n".encode("utf-8"))
 
         # --- Pass 2: Calculate offsets and build index ---
         # Index section header

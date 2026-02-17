@@ -169,12 +169,17 @@ const PFMSerializer = {
     return content.split('\n').map(line => this.escapeLine(line)).join('\n');
   },
 
-  /** Generate a UUID v4 */
+  /** Generate a UUID v4 using cryptographically secure random values */
   uuid() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-      const r = (Math.random() * 16) | 0;
-      return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
-    });
+    // Use crypto.getRandomValues for secure randomness (not Math.random)
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    // Set version (4) and variant (RFC 4122) bits
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    return hex.substring(0, 8) + '-' + hex.substring(8, 12) + '-' +
+           hex.substring(12, 16) + '-' + hex.substring(16, 20) + '-' + hex.substring(20, 32);
   },
 
   /** Compute SHA-256 checksum of section contents */
@@ -205,10 +210,18 @@ const PFMSerializer = {
     meta.checksum = hash;
 
     // Build content sections first (to calculate offsets for index)
+    // Validate and normalize section names before serialization
+    const VALID_NAME_RE = /^[a-z0-9_-]+$/;
     const sectionBlocks = [];
     for (const s of sections) {
+      let name = String(s.name || 'content').substring(0, 64);
+      if (!VALID_NAME_RE.test(name)) {
+        // Normalize: lowercase, replace invalid chars
+        name = name.toLowerCase().replace(/[\s-]/g, '_').replace(/[^a-z0-9_-]/g, '');
+        if (!name) name = 'content';
+      }
       const escaped = this.escapeContent(s.content);
-      sectionBlocks.push({ name: s.name, escaped, content: s.content });
+      sectionBlocks.push({ name, escaped, content: s.content });
     }
 
     // Build the file
@@ -218,7 +231,10 @@ const PFMSerializer = {
     pfm += '#@meta\n';
     for (const [k, v] of Object.entries(meta)) {
       if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
-      pfm += k + ': ' + v + '\n';
+      // Sanitize meta values: strip newlines and control characters to prevent format injection
+      const safeVal = String(v).replace(/[\x00-\x1f\x7f]/g, ' ');
+      const safeKey = String(k).replace(/[\x00-\x1f\x7f]/g, '_');
+      pfm += safeKey + ': ' + safeVal + '\n';
     }
 
     // Index block — calculate byte offsets
@@ -249,7 +265,10 @@ const PFMSerializer = {
     pfm += '#@meta\n';
     for (const [k, v] of Object.entries(meta)) {
       if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
-      pfm += k + ': ' + v + '\n';
+      // Sanitize meta values: strip newlines and control characters
+      const safeVal2 = String(v).replace(/[\x00-\x1f\x7f]/g, ' ');
+      const safeKey2 = String(k).replace(/[\x00-\x1f\x7f]/g, '_');
+      pfm += safeKey2 + ': ' + safeVal2 + '\n';
     }
     pfm += '#@index\n';
     pfm += indexContent;
@@ -306,7 +325,10 @@ const Converters = {
       for (const s of data.sections) {
         if (!s || typeof s.name !== 'string') continue;
         const content = typeof s.content === 'string' ? s.content : JSON.stringify(s.content, null, 2);
-        sections.push({ name: s.name.substring(0, 64), content });
+        // Normalize section name for PFM compatibility
+        let name = s.name.toLowerCase().replace(/[\s-]/g, '_').replace(/[^a-z0-9_-]/g, '').substring(0, 64);
+        if (!name) name = 'content';
+        sections.push({ name, content });
       }
     }
     // Format 2: Flat key-value — each key becomes a section
@@ -314,7 +336,10 @@ const Converters = {
       for (const [k, v] of Object.entries(data)) {
         if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
         const content = typeof v === 'string' ? v : JSON.stringify(v, null, 2);
-        sections.push({ name: k.substring(0, 64), content });
+        // Normalize key as section name
+        let name = k.toLowerCase().replace(/[\s-]/g, '_').replace(/[^a-z0-9_-]/g, '').substring(0, 64);
+        if (!name) name = 'content';
+        sections.push({ name, content });
       }
     }
 
@@ -346,7 +371,9 @@ const Converters = {
       // Structured CSV with section name + content columns
       for (let i = 1; i < lines.length; i++) {
         const cols = this.parseCSVLine(lines[i]);
-        const name = (cols[nameIdx] || '').trim().substring(0, 64);
+        // Normalize section name for PFM compatibility
+        let name = (cols[nameIdx] || '').trim().toLowerCase().replace(/[\s-]/g, '_').replace(/[^a-z0-9_-]/g, '').substring(0, 64);
+        if (!name) name = 'content';
         const content = (cols[contentIdx] || '').trim();
         if (name) sections.push({ name, content });
       }
@@ -448,7 +475,12 @@ const Converters = {
     // Each H2 becomes a section
     for (let i = 1; i < parts.length; i++) {
       const lines = parts[i].split('\n');
-      const name = lines[0].trim().substring(0, 64);
+      const rawName = lines[0].trim().substring(0, 64);
+      // Normalize section name: lowercase, replace spaces/hyphens with underscores,
+      // strip non-alphanumeric chars for PFM section name compatibility
+      let name = rawName.toLowerCase().replace(/[\s-]/g, '_');
+      name = name.replace(/[^a-z0-9_-]/g, '');
+      if (!name) name = 'content';
       const content = lines.slice(1).join('\n').trim();
       if (name) {
         sections.push({ name, content });

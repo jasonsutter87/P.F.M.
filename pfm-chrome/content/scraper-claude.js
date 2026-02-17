@@ -56,12 +56,18 @@ const ScraperClaude = {
     return all ? [] : null;
   },
 
+  /** Maximum total content size (10 MB) to prevent memory exhaustion */
+  MAX_CONTENT_SIZE: 10 * 1024 * 1024,
+  /** Maximum message count per conversation */
+  MAX_MESSAGES: 5000,
+
   detect() {
     return location.hostname === 'claude.ai';
   },
 
   scrape() {
     const messages = [];
+    let totalSize = 0;
 
     // Strategy 1: Look for explicit human/assistant turns
     const humanTurns = this.query(document, this.selectors.humanMessage, true);
@@ -90,6 +96,9 @@ const ScraperClaude = {
       });
 
       for (const turn of allTurns) {
+        if (messages.length >= this.MAX_MESSAGES) break;
+        totalSize += turn.content.length;
+        if (totalSize > this.MAX_CONTENT_SIZE) break;
         messages.push({ role: turn.role, content: turn.content });
       }
     }
@@ -99,8 +108,11 @@ const ScraperClaude = {
       const groups = this.query(document, this.selectors.messageGroup, true);
       let isUser = true;
       for (const group of groups) {
+        if (messages.length >= this.MAX_MESSAGES) break;
         const text = group.innerText.trim();
         if (text) {
+          totalSize += text.length;
+          if (totalSize > this.MAX_CONTENT_SIZE) break;
           messages.push({ role: isUser ? 'user' : 'assistant', content: text });
           isUser = !isUser;
         }
