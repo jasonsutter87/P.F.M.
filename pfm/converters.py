@@ -98,11 +98,24 @@ def from_json(json_str: str) -> PFMDocument:
 # CSV
 # =============================================================================
 
+def _escape_csv_formula(value: str) -> str:
+    """Escape CSV formula injection characters (=, +, -, @, tab, CR).
+
+    Prefixes dangerous first characters with a single quote to prevent
+    spreadsheet applications from interpreting cell content as formulas.
+    """
+    if value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
+
+
 def to_csv(doc: PFMDocument) -> str:
     """
     Convert PFM document to CSV.
     Row format: type, key/name, value/content
     First rows are meta fields, then section rows.
+
+    Security: Escapes formula injection characters to prevent spreadsheet attacks.
     """
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -110,11 +123,11 @@ def to_csv(doc: PFMDocument) -> str:
 
     # Meta rows
     for key, val in doc.get_meta_dict().items():
-        writer.writerow(["meta", key, val])
+        writer.writerow(["meta", _escape_csv_formula(key), _escape_csv_formula(val)])
 
     # Section rows
     for section in doc.sections:
-        writer.writerow(["section", section.name, section.content])
+        writer.writerow(["section", section.name, _escape_csv_formula(section.content)])
 
     return buf.getvalue()
 

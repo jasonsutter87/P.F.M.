@@ -169,18 +169,23 @@ const PFMSerializer = {
            hex.substring(12, 16) + '-' + hex.substring(16, 20) + '-' + hex.substring(20, 32);
   },
 
-  /** Compute SHA-256 checksum of section contents */
+  /** Compute SHA-256 checksum of section contents (O(N) allocation) */
   async checksum(sections) {
     const encoder = new TextEncoder();
-    let allBytes = new Uint8Array(0);
+    const chunks = [];
+    let totalLen = 0;
     for (const s of sections) {
       const encoded = encoder.encode(s.content);
-      const merged = new Uint8Array(allBytes.length + encoded.length);
-      merged.set(allBytes);
-      merged.set(encoded, allBytes.length);
-      allBytes = merged;
+      chunks.push(encoded);
+      totalLen += encoded.length;
     }
-    const hashBuffer = await crypto.subtle.digest('SHA-256', allBytes);
+    const merged = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const chunk of chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.length;
+    }
+    const hashBuffer = await crypto.subtle.digest('SHA-256', merged);
     return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
   },
 
@@ -492,6 +497,16 @@ function formatBytes(bytes) {
 
 function sanitizeFilename(name) {
   return name.replace(/[\/\\:*?"<>|]/g, '_').replace(/\.\./g, '_');
+}
+
+/** Constant-time string comparison to prevent timing side-channels on checksum validation. */
+function timingSafeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
 }
 
 function pfmDownload(content, filename, mime) {

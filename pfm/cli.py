@@ -156,6 +156,10 @@ def cmd_convert(args: argparse.Namespace) -> None:
         data = input_path.read_text(encoding="utf-8")
         doc = convert_from(data, args.format)
         output = args.output or Path(args.input).stem + ".pfm"
+        # Reject path traversal in output path
+        if ".." in Path(output).parts:
+            print("Error: Output path must not contain '..' (path traversal)", file=sys.stderr)
+            sys.exit(1)
         nbytes = doc.write(output)
         print(f"Converted {args.input} -> {output} ({nbytes} bytes)")
 
@@ -164,6 +168,10 @@ def cmd_convert(args: argparse.Namespace) -> None:
         doc = PFMReader.read(args.input)
         result = convert_to(doc, args.format)
         if args.output:
+            # Reject path traversal in output path
+            if ".." in Path(args.output).parts:
+                print("Error: Output path must not contain '..' (path traversal)", file=sys.stderr)
+                sys.exit(1)
             Path(args.output).write_text(result, encoding="utf-8")
             print(f"Converted {args.input} -> {args.output}")
         else:

@@ -54,8 +54,9 @@
     state.filteredSections = [...doc.sections];
     state.activeIndex = doc.sections.length > 0 ? 0 : -1;
 
-    PFMParser.checksum(doc.sections).then(computed => {
-      state.checksumValid = (computed === (doc.meta.checksum || ''));
+    PFMSerializer.checksum(doc.sections).then(computed => {
+      const expected = doc.meta.checksum || '';
+      state.checksumValid = expected !== '' && timingSafeEqual(computed, expected);
       renderChecksumBadge();
     });
 
@@ -245,11 +246,18 @@
     pfmDownload(md, state.filename.replace('.pfm', '.md'), 'text/markdown');
   }
 
+  function escapeCSVFormula(val) {
+    if (val && '=+-@\t\r'.indexOf(val[0]) !== -1) return "'" + val;
+    return val;
+  }
+
   function exportCSV() {
     if (!state.doc) return;
     let csv = 'section_name,content\n';
     for (const s of state.doc.sections) {
-      csv += '"' + s.name.replace(/"/g, '""') + '","' + s.content.replace(/"/g, '""') + '"\n';
+      const safeName = escapeCSVFormula(s.name).replace(/"/g, '""');
+      const safeContent = escapeCSVFormula(s.content).replace(/"/g, '""');
+      csv += '"' + safeName + '","' + safeContent + '"\n';
     }
     pfmDownload(csv, state.filename.replace('.pfm', '.csv'), 'text/csv');
   }

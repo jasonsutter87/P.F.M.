@@ -1821,8 +1821,9 @@ function loadPFM(text, filename) {
   state.activeIndex = doc.sections.length > 0 ? 0 : -1;
 
   // Async checksum validation
-  PFMParser.checksum(doc.sections).then(computed => {
-    state.checksumValid = (computed === (doc.meta.checksum || ''));
+  PFMSerializer.checksum(doc.sections).then(computed => {
+    const expected = doc.meta.checksum || '';
+    state.checksumValid = expected !== '' && timingSafeEqual(computed, expected);
     renderChecksumBadge();
   });
 
@@ -2048,6 +2049,13 @@ function exportMarkdown() {
   md += '---\n\n';
   for (const s of state.doc.sections) md += `## ${s.name}\n\n${s.content}\n\n`;
   download(md, state.filename.replace('.pfm', '.md'), 'text/markdown');
+}
+
+function timingSafeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  var result = 0;
+  for (var i = 0; i < a.length; i++) result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return result === 0;
 }
 
 function sanitizeFilename(name) {
@@ -2678,11 +2686,18 @@ function backFromConverter() {
 /* ================================================================
    Additional Export Formats
    ================================================================ */
+function escapeCSVFormula(val) {
+  if (val && '=+-@\t\r'.indexOf(val[0]) !== -1) return "'" + val;
+  return val;
+}
+
 function exportCSV() {
   if (!state.doc) return;
   let csv = 'section_name,content\n';
   for (const s of state.doc.sections) {
-    csv += '"' + s.name.replace(/"/g, '""') + '","' + s.content.replace(/"/g, '""') + '"\n';
+    var safeName = escapeCSVFormula(s.name).replace(/"/g, '""');
+    var safeContent = escapeCSVFormula(s.content).replace(/"/g, '""');
+    csv += '"' + safeName + '","' + safeContent + '"\n';
   }
   download(csv, state.filename.replace('.pfm', '.csv'), 'text/csv');
 }
