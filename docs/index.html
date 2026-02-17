@@ -76,11 +76,16 @@ input { font-family: inherit; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   height: 100%;
-  padding: 24px;
+  overflow-y: auto;
+  padding: 48px 24px 24px;
   text-align: center;
   transition: opacity var(--transition);
+}
+#landing::before,
+#landing::after {
+  content: '';
+  flex: 1;
 }
 #landing.hidden { display: none; }
 
