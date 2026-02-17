@@ -91,7 +91,7 @@ export async function serialize(doc: PFMDocument): Promise<string> {
  */
 function sanitizeMeta(value: string): string {
   // eslint-disable-next-line no-control-regex
-  return value.replace(/[\x00-\x1f\x7f]/g, ' ');
+  return value.replace(/[\x00-\x1f\x7f]/g, '');
 }
 
 /** Build the #@meta section text. */
@@ -111,27 +111,6 @@ function buildMeta(meta: Record<string, string | undefined>): string {
     }
   }
   return text;
-}
-
-/** Build the index entries. */
-function buildIndex(
-  sections: Array<{ name: string; content: string }>,
-  startOffset: number
-): string {
-  const encoder = new TextEncoder();
-  let index = '';
-  let offset = startOffset;
-
-  for (const s of sections) {
-    const headerLine = `#@${s.name}\n`;
-    const contentLine = s.content + '\n';
-    const contentOffset = offset + encoder.encode(headerLine).length;
-    const contentLen = encoder.encode(contentLine).length;
-    index += `${s.name} ${contentOffset} ${contentLen}\n`;
-    offset = contentOffset + contentLen;
-  }
-
-  return index;
 }
 
 /**

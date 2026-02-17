@@ -277,10 +277,10 @@ def from_markdown(md_str: str) -> PFMDocument:
                 if pre_content:
                     doc.add_section("content", pre_content)
 
-            # Normalize section name: lowercase, replace spaces with underscores,
+            # Normalize section name: lowercase, replace spaces with hyphens,
             # strip non-alphanumeric chars for PFM section name compatibility
             raw_name = line[3:].strip()
-            normalized = raw_name.lower().replace(" ", "_").replace("-", "_")
+            normalized = raw_name.lower().replace(" ", "-")
             normalized = "".join(
                 c for c in normalized if c in "abcdefghijklmnopqrstuvwxyz0123456789_-"
             )

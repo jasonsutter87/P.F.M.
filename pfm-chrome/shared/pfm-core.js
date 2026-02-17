@@ -217,7 +217,7 @@ const PFMSerializer = {
       let name = String(s.name || 'content').substring(0, 64);
       if (!VALID_NAME_RE.test(name)) {
         // Normalize: lowercase, replace invalid chars
-        name = name.toLowerCase().replace(/[\s-]/g, '_').replace(/[^a-z0-9_-]/g, '');
+        name = name.toLowerCase().replace(/\s/g, '-').replace(/[^a-z0-9_-]/g, '');
         if (!name) name = 'content';
       }
       const escaped = this.escapeContent(s.content);
@@ -232,46 +232,38 @@ const PFMSerializer = {
     for (const [k, v] of Object.entries(meta)) {
       if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
       // Sanitize meta values: strip newlines and control characters to prevent format injection
-      const safeVal = String(v).replace(/[\x00-\x1f\x7f]/g, ' ');
-      const safeKey = String(k).replace(/[\x00-\x1f\x7f]/g, '_');
+      const safeVal = String(v).replace(/[\x00-\x1f\x7f]/g, '');
+      const safeKey = String(k).replace(/[\x00-\x1f\x7f]/g, '');
       pfm += safeKey + ': ' + safeVal + '\n';
     }
 
-    // Index block — calculate byte offsets
-    pfm += '#@index\n';
-    let offset = new TextEncoder().encode(pfm).length;
-    // First pass: compute index lines to know their size
-    let indexLines = '';
-    for (const sb of sectionBlocks) {
-      indexLines += sb.name + ' 0 0\n'; // placeholder
-    }
-    offset += new TextEncoder().encode(indexLines).length;
+    // Index block — calculate byte offsets with convergence loop
+    // (offset digits can change index size, shifting all offsets)
+    const encoder = new TextEncoder();
+    const headerWithoutIndex = pfm;
+    const headerBytes = encoder.encode(headerWithoutIndex).length;
+    const indexHeader = '#@index\n';
 
-    // Now calculate real offsets
-    let indexContent = '';
-    for (const sb of sectionBlocks) {
-      const header = '#@' + sb.name + '\n';
-      const body = sb.escaped + '\n';
-      const headerBytes = new TextEncoder().encode(header).length;
-      const bodyBytes = new TextEncoder().encode(body).length;
-      const sectionSize = headerBytes + bodyBytes;
-
-      indexContent += sb.name + ' ' + offset + ' ' + bodyBytes + '\n';
-      offset += sectionSize;
+    let prevIndex = '';
+    let finalIndex = '';
+    for (let pass = 0; pass < 5; pass++) {
+      const indexSize = encoder.encode(indexHeader + prevIndex).length;
+      const sectionStart = headerBytes + indexSize;
+      finalIndex = '';
+      let off = sectionStart;
+      for (const sb of sectionBlocks) {
+        const sectionHdr = '#@' + sb.name + '\n';
+        const body = sb.escaped + '\n';
+        const contentOffset = off + encoder.encode(sectionHdr).length;
+        const contentLen = encoder.encode(body).length;
+        finalIndex += sb.name + ' ' + contentOffset + ' ' + contentLen + '\n';
+        off = contentOffset + contentLen;
+      }
+      if (finalIndex === prevIndex) break;
+      prevIndex = finalIndex;
     }
 
-    // Rebuild with real index
-    pfm = '#!PFM/1.0\n';
-    pfm += '#@meta\n';
-    for (const [k, v] of Object.entries(meta)) {
-      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
-      // Sanitize meta values: strip newlines and control characters
-      const safeVal2 = String(v).replace(/[\x00-\x1f\x7f]/g, ' ');
-      const safeKey2 = String(k).replace(/[\x00-\x1f\x7f]/g, '_');
-      pfm += safeKey2 + ': ' + safeVal2 + '\n';
-    }
-    pfm += '#@index\n';
-    pfm += indexContent;
+    pfm = headerWithoutIndex + indexHeader + finalIndex;
 
     // Section blocks
     for (const sb of sectionBlocks) {
@@ -326,7 +318,7 @@ const Converters = {
         if (!s || typeof s.name !== 'string') continue;
         const content = typeof s.content === 'string' ? s.content : JSON.stringify(s.content, null, 2);
         // Normalize section name for PFM compatibility
-        let name = s.name.toLowerCase().replace(/[\s-]/g, '_').replace(/[^a-z0-9_-]/g, '').substring(0, 64);
+        let name = s.name.toLowerCase().replace(/\s/g, '-').replace(/[^a-z0-9_-]/g, '').substring(0, 64);
         if (!name) name = 'content';
         sections.push({ name, content });
       }
@@ -337,7 +329,7 @@ const Converters = {
         if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
         const content = typeof v === 'string' ? v : JSON.stringify(v, null, 2);
         // Normalize key as section name
-        let name = k.toLowerCase().replace(/[\s-]/g, '_').replace(/[^a-z0-9_-]/g, '').substring(0, 64);
+        let name = k.toLowerCase().replace(/\s/g, '-').replace(/[^a-z0-9_-]/g, '').substring(0, 64);
         if (!name) name = 'content';
         sections.push({ name, content });
       }
@@ -372,7 +364,7 @@ const Converters = {
       for (let i = 1; i < lines.length; i++) {
         const cols = this.parseCSVLine(lines[i]);
         // Normalize section name for PFM compatibility
-        let name = (cols[nameIdx] || '').trim().toLowerCase().replace(/[\s-]/g, '_').replace(/[^a-z0-9_-]/g, '').substring(0, 64);
+        let name = (cols[nameIdx] || '').trim().toLowerCase().replace(/\s/g, '-').replace(/[^a-z0-9_-]/g, '').substring(0, 64);
         if (!name) name = 'content';
         const content = (cols[contentIdx] || '').trim();
         if (name) sections.push({ name, content });
@@ -452,10 +444,10 @@ const Converters = {
       body = text.substring(fmMatch[0].length);
       const fmLines = fmMatch[1].split('\n');
       for (const line of fmLines) {
-        const sep = line.indexOf(':');
+        const sep = line.indexOf(': ');
         if (sep !== -1) {
           const key = line.substring(0, sep).trim();
-          const val = line.substring(sep + 1).trim();
+          const val = line.substring(sep + 2).trim();
           if (key && val && key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
             meta[key] = val;
           }
@@ -476,9 +468,9 @@ const Converters = {
     for (let i = 1; i < parts.length; i++) {
       const lines = parts[i].split('\n');
       const rawName = lines[0].trim().substring(0, 64);
-      // Normalize section name: lowercase, replace spaces/hyphens with underscores,
+      // Normalize section name: lowercase, replace spaces with hyphens,
       // strip non-alphanumeric chars for PFM section name compatibility
-      let name = rawName.toLowerCase().replace(/[\s-]/g, '_');
+      let name = rawName.toLowerCase().replace(/\s/g, '-');
       name = name.replace(/[^a-z0-9_-]/g, '');
       if (!name) name = 'content';
       const content = lines.slice(1).join('\n').trim();

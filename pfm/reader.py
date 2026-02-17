@@ -16,6 +16,7 @@ Security features:
 
 from __future__ import annotations
 
+import builtins
 import hashlib
 import hmac as _hmac
 from pathlib import Path
@@ -223,7 +224,6 @@ class PFMReader:
 
 
 # Keep builtins reference so 'open' classmethod doesn't shadow
-import builtins
 builtins_open = builtins.open
 
 

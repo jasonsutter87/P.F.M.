@@ -53,7 +53,7 @@ from pathlib import Path
 from pfm.spec import (
     MAGIC, EOF_MARKER, SECTION_PREFIX, FORMAT_VERSION,
     MAX_FILE_SIZE, MAX_SECTIONS, MAX_SECTION_NAME_LENGTH,
-    ALLOWED_SECTION_NAME_CHARS, escape_content,
+    ALLOWED_SECTION_NAME_CHARS, escape_content, unescape_content,
 )
 
 
@@ -79,11 +79,18 @@ class PFMStreamWriter:
         if append and self.path.exists():
             self._handle, self._sections = _recover(self.path)
             # Recompute running checksum from existing sections
+            # Must unescape content before hashing to match PFMDocument.compute_checksum()
             self._checksum = hashlib.sha256()
             raw = self.path.read_bytes()
             for name, offset, length in self._sections:
                 if 0 <= offset and offset + length <= len(raw):
-                    self._checksum.update(raw[offset:offset + length])
+                    chunk = raw[offset:offset + length]
+                    # Strip trailing newline (writer protocol)
+                    if chunk.endswith(b"\n"):
+                        chunk = chunk[:-1]
+                    # Unescape before checksumming (matches full reader behavior)
+                    unescaped = unescape_content(chunk.decode("utf-8"))
+                    self._checksum.update(unescaped.encode("utf-8"))
             # Position at end, before any trailing index/EOF
             self._handle.seek(0, 2)
         else:
