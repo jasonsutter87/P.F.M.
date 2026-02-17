@@ -22,10 +22,10 @@ class PFMWriter:
 
     @staticmethod
     def serialize(doc: PFMDocument) -> bytes:
-        """Serialize a PFMDocument to bytes. Fast two-pass assembly."""
+        """Serialize a PFMDocument to bytes. Pure — does not mutate the input document."""
 
-        # Compute checksum before serialization
-        doc.checksum = doc.compute_checksum()
+        # Compute checksum without mutating doc
+        checksum = doc.compute_checksum()
 
         # --- Pass 1: Pre-serialize sections (with content escaping) ---
         section_blobs: list[tuple[str, bytes]] = []
@@ -48,6 +48,8 @@ class PFMWriter:
         # Meta section
         header.write(f"{SECTION_PREFIX}meta\n".encode("utf-8"))
         meta = doc.get_meta_dict()
+        # Override checksum with freshly computed value
+        meta["checksum"] = checksum
         for key, val in meta.items():
             header.write(f"{key}: {val}\n".encode("utf-8"))
 
@@ -111,11 +113,6 @@ class PFMWriter:
             if len(index_bytes) == len(test_index_bytes):
                 break  # Converged
             # Otherwise loop with corrected sizes
-
-        # Update section objects with computed offsets
-        for i, (name, offset, length) in enumerate(final_entries):
-            doc.sections[i].offset = offset
-            doc.sections[i].length = length
 
         # --- Assemble final output ---
         out = io.BytesIO()

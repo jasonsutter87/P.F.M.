@@ -191,8 +191,16 @@ export function parsePFM(text: string): PFMDocument {
   }
 }
 
+/** Check if line has a PFM marker after any leading backslashes. */
+function hasMarkerAfterBackslashes(line: string): boolean {
+  let i = 0;
+  while (i < line.length && line[i] === '\\') i++;
+  const rest = line.substring(i);
+  return rest.startsWith('#@') || rest.startsWith('#!PFM') || rest.startsWith('#!END');
+}
+
 function unescapeLine(line: string): string {
-  if (line.startsWith('\\#')) {
+  if (line.startsWith('\\') && hasMarkerAfterBackslashes(line.substring(1))) {
     return line.substring(1);
   }
   return line;

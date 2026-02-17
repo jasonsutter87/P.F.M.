@@ -52,12 +52,15 @@ class TestWriter:
         assert "main output" in text
         assert "User: hello" in text
 
-    def test_serialize_sets_checksum(self):
+    def test_serialize_includes_correct_checksum(self):
+        """serialize() is pure — doesn't mutate doc, but output contains correct checksum."""
         doc = PFMDocument.create(agent="test")
         doc.add_section("content", "data")
 
-        PFMWriter.serialize(doc)
-        assert doc.checksum == doc.compute_checksum()
+        data = PFMWriter.serialize(doc)
+        expected = doc.compute_checksum()
+        restored = PFMReader.parse(data)
+        assert restored.checksum == expected
 
     def test_write_to_file(self):
         doc = PFMDocument.create(agent="test")

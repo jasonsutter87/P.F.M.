@@ -231,7 +231,7 @@
   function exportMarkdown() {
     if (!state.doc) return;
     let md = '---\n';
-    for (const [k, v] of Object.entries(state.doc.meta)) md += k + ': ' + v + '\n';
+    for (const [k, v] of Object.entries(state.doc.meta)) md += k + ': ' + String(v).replace(/\n/g, ' ') + '\n';
     md += '---\n\n';
     for (const s of state.doc.sections) md += '## ' + s.name + '\n\n' + s.content + '\n\n';
     pfmDownload(md, state.filename.replace('.pfm', '.md'), 'text/markdown');

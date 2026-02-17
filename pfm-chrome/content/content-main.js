@@ -114,13 +114,15 @@
         sections.push({ name: 'summary', content: summary });
       }
 
-      // Meta
+      // Meta — sanitize URL and title to prevent format injection
+      const safeUrl = location.href.replace(/[\x00-\x1f]/g, '');
+      const safeTitle = (result.title || '').replace(/[\x00-\x1f]/g, '').substring(0, 200);
       const meta = {
         agent: result.model || result.platform,
         model: result.model,
         source_platform: result.platform,
-        source_url: location.href,
-        title: result.title,
+        source_url: safeUrl,
+        title: safeTitle,
         tags: 'ai-conversation,' + result.platform
       };
 
@@ -237,8 +239,10 @@
     window.addEventListener('popstate', () => setTimeout(init, 1000));
   }
 
-  /** Listen for messages from popup requesting capture */
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  /** Listen for messages from popup requesting capture (same extension only) */
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    // Validate sender is from our own extension
+    if (!sender.id || sender.id !== chrome.runtime.id) return;
     if (msg.action === 'capture_conversation') {
       const scraper = getScraper();
       if (!scraper) {

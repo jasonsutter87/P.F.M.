@@ -2,7 +2,7 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
-[![Tests: 101 passing](https://img.shields.io/badge/tests-101%20passing-brightgreen.svg)]()
+[![Tests: 178 passing](https://img.shields.io/badge/tests-178%20passing-brightgreen.svg)]()
 [![npm: pfm](https://img.shields.io/badge/npm-pfm-cb3837.svg)](https://www.npmjs.com/package/pfm)
 [![Security: A+](https://img.shields.io/badge/security-A%2B-brightgreen.svg)]()
 [![Web Viewer](https://img.shields.io/badge/web-viewer%20%26%20converter-58a6ff.svg)](https://jasonsutter87.github.io/P.F.M.-Pure-Fucking-Magic-/)

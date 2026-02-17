@@ -27,7 +27,7 @@
     "build": "npm run build:esm && npm run build:cjs",
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:cjs": "tsc -p tsconfig.cjs.json && node scripts/fixup-cjs.js",
-    "test": "node --test dist/esm/__tests__/index.test.js",
+    "test": "node --test dist/esm/__tests__/index.test.js dist/esm/__tests__/conformance.test.js",
     "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [
