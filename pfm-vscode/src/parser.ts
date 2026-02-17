@@ -151,8 +151,8 @@ export function parsePFM(text: string): PFMDocument {
       if (sepIdx !== -1) {
         const key = line.substring(0, sepIdx).trim();
         const val = line.substring(sepIdx + 2).trim();
-        // Prevent prototype pollution and enforce field count limit (O(1) check)
-        if (!FORBIDDEN_KEYS.has(key) && metaFieldCount < MAX_META_FIELDS) {
+        // Prevent prototype pollution, first-wins, and enforce field count limit
+        if (!FORBIDDEN_KEYS.has(key) && !(key in doc.meta) && metaFieldCount < MAX_META_FIELDS) {
           doc.meta[key] = val;
           metaFieldCount++;
         }

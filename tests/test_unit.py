@@ -142,3 +142,84 @@ class TestSpec:
         assert "tools" in SECTION_TYPES
         assert "meta" in SECTION_TYPES
         assert "index" in SECTION_TYPES
+
+
+class TestSectionNameValidation:
+    """Tests for section name charset enforcement."""
+
+    def test_rejects_uppercase(self):
+        doc = PFMDocument.create()
+        with pytest.raises(ValueError, match="Invalid section name"):
+            doc.add_section("Content", "data")
+
+    def test_rejects_space(self):
+        doc = PFMDocument.create()
+        with pytest.raises(ValueError, match="Invalid section name"):
+            doc.add_section("my section", "data")
+
+    def test_rejects_dot(self):
+        doc = PFMDocument.create()
+        with pytest.raises(ValueError, match="Invalid section name"):
+            doc.add_section("my.section", "data")
+
+    def test_rejects_empty(self):
+        doc = PFMDocument.create()
+        with pytest.raises(ValueError, match="cannot be empty"):
+            doc.add_section("", "data")
+
+    def test_rejects_reserved_meta(self):
+        doc = PFMDocument.create()
+        with pytest.raises(ValueError, match="Reserved"):
+            doc.add_section("meta", "data")
+
+    def test_rejects_reserved_index(self):
+        doc = PFMDocument.create()
+        with pytest.raises(ValueError, match="Reserved"):
+            doc.add_section("index", "data")
+
+    def test_accepts_valid_names(self):
+        doc = PFMDocument.create()
+        doc.add_section("content", "ok")
+        doc.add_section("my-section", "ok")
+        doc.add_section("section_2", "ok")
+        assert len(doc.sections) == 3
+
+
+class TestVersionRejection:
+    """Tests for unsupported format version rejection."""
+
+    def test_parse_rejects_unknown_version(self):
+        from pfm.reader import PFMReader
+        data = b"#!PFM/2.0\n#@meta\nagent: test\n#@content\nhello\n#!END\n"
+        with pytest.raises(ValueError, match="Unsupported PFM format version"):
+            PFMReader.parse(data)
+
+    def test_reader_handle_rejects_unknown_version(self):
+        import tempfile
+        from pathlib import Path
+        from pfm.reader import PFMReader
+        data = b"#!PFM/2.0\n#@meta\nagent: test\n#@content\nhello\n#!END\n"
+        with tempfile.NamedTemporaryFile(suffix=".pfm", delete=False) as f:
+            f.write(data)
+            path = f.name
+        with pytest.raises(ValueError, match="Unsupported"):
+            PFMReader.open(path)
+        Path(path).unlink()
+
+    def test_parse_accepts_version_1_0(self):
+        from pfm.reader import PFMReader
+        data = b"#!PFM/1.0\n#@meta\nagent: test\n#@content\nhello\n#!END\n"
+        doc = PFMReader.parse(data)
+        assert doc.format_version == "1.0"
+
+    def test_file_size_limit_enforced(self):
+        import tempfile
+        from pathlib import Path
+        from pfm.reader import PFMReader
+        data = b"#!PFM/1.0\n#@meta\n" + b"x" * 100
+        with tempfile.NamedTemporaryFile(suffix=".pfm", delete=False) as f:
+            f.write(data)
+            path = f.name
+        with pytest.raises(ValueError, match="exceeds maximum"):
+            PFMReader.read(path, max_size=50)
+        Path(path).unlink()

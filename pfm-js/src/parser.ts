@@ -117,7 +117,8 @@ export function parse(text: string): PFMDocument {
         const key = line.substring(0, sep).trim();
         const val = line.substring(sep + 2).trim();
         // Prevent prototype pollution: reject dangerous keys
-        if (!FORBIDDEN_KEYS.has(key)) {
+        // First-wins: prevent duplicate meta key override
+        if (!FORBIDDEN_KEYS.has(key) && !(key in doc.meta)) {
           (doc.meta as Record<string, string>)[key] = val;
           metaFieldCount++;
         }

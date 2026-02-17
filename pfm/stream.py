@@ -253,18 +253,28 @@ def _recover(path: Path) -> tuple:
 
     PFM-004 fix: Creates backup before truncation, uses rfind for marker search.
     """
-    # Enforce file size limit before reading into memory
-    file_size = path.stat().st_size
-    if file_size > MAX_FILE_SIZE:
-        raise ValueError(
-            f"File size {file_size} exceeds maximum {MAX_FILE_SIZE} bytes"
+    # Open file and acquire lock BEFORE reading to prevent TOCTOU
+    handle = open(path, "r+b")
+    try:
+        _lock_file(handle)
+    except (OSError, IOError):
+        handle.close()
+        raise RuntimeError(
+            f"Cannot acquire lock on {path}: file is in use by another process"
         )
 
-    # Create backup before any modifications
-    backup_path = path.with_suffix(path.suffix + ".bak")
-    shutil.copy2(path, backup_path)
+    # Read from the locked handle
+    raw = handle.read()
+    if len(raw) > MAX_FILE_SIZE:
+        handle.close()
+        raise ValueError(
+            f"File size {len(raw)} exceeds maximum {MAX_FILE_SIZE} bytes"
+        )
 
-    raw = path.read_bytes()
+    # Create backup from in-memory bytes (avoids double-read)
+    backup_path = path.with_suffix(path.suffix + ".bak")
+    backup_path.write_bytes(raw)
+
     text = raw.decode("utf-8")
     lines = text.split("\n")
 
@@ -291,9 +301,14 @@ def _recover(path: Path) -> tuple:
             # Skip meta, index, and trailing index
             if section_tag in ("meta", "index", "index-trailing"):
                 current_section_name = None
-            else:
+            elif (
+                len(section_tag) <= MAX_SECTION_NAME_LENGTH
+                and all(c in ALLOWED_SECTION_NAME_CHARS for c in section_tag)
+            ):
                 current_section_name = section_tag
                 current_content_start = byte_pos + line_bytes
+            else:
+                current_section_name = None  # Skip invalid section names
 
         elif (line.startswith(EOF_MARKER) or line.startswith(MAGIC)) and not line.startswith("\\#"):
             # Flush previous section
@@ -324,15 +339,7 @@ def _recover(path: Path) -> tuple:
         if eof_pos >= 0:
             truncate_at = len(text[:eof_pos].encode("utf-8"))
 
-    handle = open(path, "r+b")
-    # PFM-008/Stream: Acquire exclusive lock to prevent TOCTOU race conditions
-    try:
-        _lock_file(handle)
-    except (OSError, IOError):
-        handle.close()
-        raise RuntimeError(
-            f"Cannot acquire lock on {path}: file is in use by another process"
-        )
+    # Lock already acquired at start of _recover()
     handle.seek(truncate_at)
     handle.truncate()
 

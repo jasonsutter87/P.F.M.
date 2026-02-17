@@ -133,7 +133,7 @@
       showStatus(btn, 'Saved!', false);
     } catch (err) {
       console.error('[PFM] Capture error:', err);
-      showStatus(btn, 'Error: ' + err.message, true);
+      showStatus(btn, 'Capture failed. See console for details.', true);
     }
 
     function showStatus(btn, msg, isError) {

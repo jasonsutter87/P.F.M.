@@ -218,3 +218,55 @@ class TestStreamRecovery:
         assert doc.chain == "session 2 chain"
 
         Path(path).unlink()
+
+
+class TestStreamChecksum:
+    """Tests for stream file checksum validation via the reader."""
+
+    def test_stream_checksum_validates(self):
+        """Stream file checksum should validate via PFMReader.open()."""
+        with tempfile.NamedTemporaryFile(suffix=".pfm", delete=False) as f:
+            path = f.name
+
+        with PFMStreamWriter(path, agent="checksum-test") as w:
+            w.write_section("content", "check this")
+            w.write_section("chain", "and this")
+
+        with PFMReader.open(path) as reader:
+            assert reader.validate_checksum(), "Stream file checksum should validate"
+
+        Path(path).unlink()
+
+    def test_stream_checksum_detects_tampering(self):
+        """Tampering with content should invalidate checksum."""
+        with tempfile.NamedTemporaryFile(suffix=".pfm", delete=False) as f:
+            path = f.name
+
+        with PFMStreamWriter(path, agent="tamper-test") as w:
+            w.write_section("content", "original content")
+
+        # Tamper with the file (replace 'original' with 'modified')
+        raw = Path(path).read_text()
+        raw = raw.replace("original content", "modified content")
+        Path(path).write_text(raw)
+
+        with PFMReader.open(path) as reader:
+            assert not reader.validate_checksum(), "Tampered checksum should be invalid"
+
+        Path(path).unlink()
+
+    def test_stream_bak_cleanup(self):
+        """After successful append + close, .bak file should be cleaned up."""
+        with tempfile.NamedTemporaryFile(suffix=".pfm", delete=False) as f:
+            path = f.name
+
+        with PFMStreamWriter(path, agent="bak-test") as w:
+            w.write_section("content", "session 1")
+
+        with PFMStreamWriter(path, append=True) as w:
+            w.write_section("chain", "session 2")
+
+        bak_path = Path(path + ".bak")
+        assert not bak_path.exists(), ".bak file should be cleaned up after close"
+
+        Path(path).unlink()

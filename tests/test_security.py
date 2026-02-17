@@ -230,3 +230,47 @@ class TestFingerprint:
         doc2.checksum = doc2.compute_checksum()
 
         assert fingerprint(doc1) != fingerprint(doc2)
+
+
+class TestVerifyRequire:
+    """Tests for verify(require=True) — fail-strict mode."""
+
+    def test_verify_require_unsigned_raises(self):
+        doc = PFMDocument.create()
+        doc.add_section("content", "unsigned data")
+        with pytest.raises(ValueError, match="no signature"):
+            verify(doc, "any-key", require=True)
+
+    def test_verify_require_with_valid_signature(self):
+        doc = PFMDocument.create()
+        doc.add_section("content", "signed data")
+        sign(doc, "key")
+        assert verify(doc, "key", require=True) is True
+
+    def test_verify_require_with_wrong_key(self):
+        doc = PFMDocument.create()
+        doc.add_section("content", "data")
+        sign(doc, "correct")
+        assert verify(doc, "wrong", require=True) is False
+
+
+class TestDocumentValidateChecksum:
+    """Tests for PFMDocument.validate_checksum() convenience method."""
+
+    def test_validate_checksum_valid(self):
+        doc = PFMDocument.create()
+        doc.add_section("content", "test")
+        doc.checksum = doc.compute_checksum()
+        assert doc.validate_checksum() is True
+
+    def test_validate_checksum_tampered(self):
+        doc = PFMDocument.create()
+        doc.add_section("content", "original")
+        doc.checksum = doc.compute_checksum()
+        doc.sections[0].content = "tampered"
+        assert doc.validate_checksum() is False
+
+    def test_validate_checksum_missing(self):
+        doc = PFMDocument.create()
+        doc.add_section("content", "no checksum")
+        assert doc.validate_checksum() is False

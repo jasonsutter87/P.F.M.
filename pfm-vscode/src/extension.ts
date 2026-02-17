@@ -14,6 +14,16 @@ import { PFMCodeLensProvider } from './codelens/codeLensProvider';
 
 const PFM_SELECTOR: vscode.DocumentSelector = { language: 'pfm', scheme: 'file' };
 
+/** Constant-time string comparison to prevent timing side-channels. */
+function timingSafeEqual(a: string, b: string): boolean {
+  const len = Math.max(a.length, b.length);
+  let result = a.length === b.length ? 0 : 1;
+  for (let i = 0; i < len; i++) {
+    result |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  }
+  return result === 0;
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   // Document Symbol Provider (outline)
   context.subscriptions.push(
@@ -65,7 +75,7 @@ export function activate(context: vscode.ExtensionContext): void {
       }
 
       const actual = await computeChecksum(doc.sections);
-      if (actual === expected) {
+      if (timingSafeEqual(actual, expected)) {
         vscode.window.showInformationMessage('PFM Checksum: VALID');
       } else {
         vscode.window.showErrorMessage(

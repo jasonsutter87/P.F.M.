@@ -72,8 +72,13 @@ export function fromJSON(json: string): PFMDocument {
       content: String(s.content),
     }));
 
+  const version = typeof data.pfm_version === 'string' ? data.pfm_version : '1.0';
+  if (version !== '1.0') {
+    throw new Error(`Unsupported PFM format version: '${version}'`);
+  }
+
   return {
-    formatVersion: typeof data.pfm_version === 'string' ? data.pfm_version : '1.0',
+    formatVersion: version,
     isStream: false,
     meta: safeMeta,
     sections: safeSections,

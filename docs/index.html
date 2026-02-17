@@ -1657,8 +1657,11 @@ const PFMParser = {
           if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
             continue;
           }
-          doc.meta[key] = val;
-          metaFieldCount++;
+          // First-wins: prevent duplicate meta key override
+          if (!(key in doc.meta)) {
+            doc.meta[key] = val;
+            metaFieldCount++;
+          }
         }
         continue;
       }
@@ -2055,9 +2058,9 @@ function exportMarkdown() {
 }
 
 function timingSafeEqual(a, b) {
-  if (a.length !== b.length) return false;
-  var result = 0;
-  for (var i = 0; i < a.length; i++) result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  var len = Math.max(a.length, b.length);
+  var result = a.length === b.length ? 0 : 1;
+  for (var i = 0; i < len; i++) result |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
   return result === 0;
 }
 

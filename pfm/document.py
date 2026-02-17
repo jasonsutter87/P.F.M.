@@ -153,8 +153,20 @@ class PFMDocument:
         s = self.get_section("chain")
         return s.content if s else None
 
-    def write(self, path: str) -> int:
+    def validate_checksum(self) -> bool:
+        """Validate document integrity by recomputing and comparing checksum.
+
+        Returns False if no checksum is stored (fail-closed).
+        """
+        from pfm.security import verify_integrity
+        return verify_integrity(self)
+
+    def write(self, path: str, mode: int = 0o644) -> int:
         """Write this document to a .pfm file. Returns bytes written.
+
+        Args:
+            path: Output file path.
+            mode: File permissions (default 0o644). Use 0o600 for sensitive files.
 
         Raises ValueError if path contains '..' (path traversal prevention).
         """
@@ -162,7 +174,7 @@ class PFMDocument:
         if ".." in _Path(path).parts:
             raise ValueError("Output path must not contain '..' (path traversal)")
         from pfm.writer import PFMWriter
-        return PFMWriter.write(self, path)
+        return PFMWriter.write(self, path, mode)
 
     def to_bytes(self) -> bytes:
         """Serialize this document to bytes."""

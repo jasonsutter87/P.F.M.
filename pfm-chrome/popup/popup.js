@@ -143,6 +143,13 @@
       if (ext === 'pfm') {
         // View .pfm — hand off to viewer tab
         try {
+          // chrome.storage.session has a ~10MB quota; reject files that exceed it
+          const MAX_SESSION_BYTES = 8 * 1024 * 1024; // 8MB safely under quota
+          if (new TextEncoder().encode(text).length > MAX_SESSION_BYTES) {
+            fileStatus.textContent = 'File too large for viewer tab (max 8 MB)';
+            fileStatus.className = 'status error';
+            return;
+          }
           await chrome.storage.session.set({ pfm_pending: text, pfm_filename: file.name });
           chrome.runtime.sendMessage({ action: 'open_viewer' });
           fileStatus.textContent = 'Opening viewer...';

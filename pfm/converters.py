@@ -351,8 +351,15 @@ def convert_to(doc: PFMDocument, fmt: str) -> str:
 
 
 def convert_from(data: str, fmt: str, **kwargs) -> PFMDocument:
-    """Create a PFM document from data in the specified format."""
+    """Create a PFM document from data in the specified format.
+
+    Only 'txt' format accepts extra kwargs (agent=, model=).
+    Other formats ignore unknown kwargs to prevent TypeError.
+    """
     converter = CONVERTERS_FROM.get(fmt.lower())
     if converter is None:
         raise ValueError(f"Unknown format: {fmt}. Supported: {list(CONVERTERS_FROM.keys())}")
-    return converter(data, **kwargs)
+    # Only from_txt accepts kwargs; strip them for other converters
+    if fmt.lower() == "txt":
+        return converter(data, **kwargs)
+    return converter(data)

@@ -3,6 +3,7 @@
  */
 
 import * as vscode from 'vscode';
+import * as crypto from 'crypto';
 import { parsePFM, PFMDocument } from '../parser';
 
 export class PFMPreviewPanel {
@@ -193,6 +194,5 @@ function esc(s: string): string {
 
 /** Generate a random nonce for Content-Security-Policy. */
 function getNonce(): string {
-  const crypto = require('crypto');
   return crypto.randomBytes(16).toString('base64');
 }

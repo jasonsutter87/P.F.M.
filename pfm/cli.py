@@ -7,6 +7,8 @@ Commands:
   pfm read     - Read a specific section from a .pfm file
   pfm validate - Validate a .pfm file (checksum, structure)
   pfm convert  - Convert to/from JSON, CSV, TXT, Markdown
+  pfm encrypt  - Encrypt a .pfm file with AES-256-GCM
+  pfm decrypt  - Decrypt an encrypted .pfm file
   pfm sign     - Sign a .pfm file with HMAC-SHA256
   pfm verify   - Verify HMAC-SHA256 signature of a .pfm file
   pfm identify - Quick check if a file is PFM format
@@ -213,6 +215,63 @@ def cmd_view(args: argparse.Namespace) -> None:
     run_viewer(path)
 
 
+def cmd_encrypt(args: argparse.Namespace) -> None:
+    """Encrypt a .pfm file with AES-256-GCM."""
+    from pfm.reader import PFMReader
+    from pfm.security import encrypt_document
+
+    doc = PFMReader.read(args.path)
+    password = args.password
+    if not password:
+        import getpass
+        password = getpass.getpass("Password: ")
+        confirm = getpass.getpass("Confirm: ")
+        if password != confirm:
+            print("Error: Passwords do not match", file=sys.stderr)
+            sys.exit(1)
+    if not password:
+        print("Error: Password cannot be empty", file=sys.stderr)
+        sys.exit(1)
+
+    output = args.output or args.path + ".enc"
+    if ".." in Path(output).parts:
+        print("Error: Output path must not contain '..' (path traversal)", file=sys.stderr)
+        sys.exit(1)
+    encrypted = encrypt_document(doc, password)
+    Path(output).write_bytes(encrypted)
+    print(f"Encrypted {args.path} -> {output} ({len(encrypted)} bytes)")
+
+
+def cmd_decrypt(args: argparse.Namespace) -> None:
+    """Decrypt an encrypted .pfm file."""
+    from pfm.security import decrypt_document
+
+    data = Path(args.path).read_bytes()
+    password = args.password
+    if not password:
+        import getpass
+        password = getpass.getpass("Password: ")
+    if not password:
+        print("Error: Password cannot be empty", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        doc = decrypt_document(data, password)
+    except Exception:
+        print("Error: Decryption failed (wrong password or corrupted file)", file=sys.stderr)
+        sys.exit(1)
+
+    output = args.output
+    if not output:
+        # Strip .enc suffix if present
+        output = args.path.removesuffix(".enc") if args.path.endswith(".enc") else args.path + ".dec.pfm"
+    if ".." in Path(output).parts:
+        print("Error: Output path must not contain '..' (path traversal)", file=sys.stderr)
+        sys.exit(1)
+    nbytes = doc.write(output)
+    print(f"Decrypted {args.path} -> {output} ({nbytes} bytes)")
+
+
 def cmd_sign(args: argparse.Namespace) -> None:
     """Sign a .pfm file with HMAC-SHA256."""
     from pfm.reader import PFMReader
@@ -319,6 +378,18 @@ def main() -> None:
     p_view.add_argument("--html", action="store_true", help="Generate standalone HTML file")
     p_view.add_argument("-o", "--output", help="Output path for --html mode")
 
+    # encrypt
+    p_encrypt = sub.add_parser("encrypt", help="Encrypt a .pfm file with AES-256-GCM")
+    p_encrypt.add_argument("path", help="Path to .pfm file")
+    p_encrypt.add_argument("-p", "--password", help="Encryption password (prompted if omitted)")
+    p_encrypt.add_argument("-o", "--output", help="Output path (default: <path>.enc)")
+
+    # decrypt
+    p_decrypt = sub.add_parser("decrypt", help="Decrypt an encrypted .pfm file")
+    p_decrypt.add_argument("path", help="Path to encrypted file")
+    p_decrypt.add_argument("-p", "--password", help="Decryption password (prompted if omitted)")
+    p_decrypt.add_argument("-o", "--output", help="Output path")
+
     # sign
     p_sign = sub.add_parser("sign", help="Sign a .pfm file with HMAC-SHA256")
     p_sign.add_argument("path", help="Path to .pfm file")
@@ -347,6 +418,8 @@ def main() -> None:
         "validate": cmd_validate,
         "convert": cmd_convert,
         "view": cmd_view,
+        "encrypt": cmd_encrypt,
+        "decrypt": cmd_decrypt,
         "sign": cmd_sign,
         "verify": cmd_verify,
         "identify": cmd_identify,

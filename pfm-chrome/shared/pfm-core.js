@@ -92,8 +92,11 @@ const PFMParser = {
           if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
             continue;
           }
-          doc.meta[key] = val;
-          metaFieldCount++;
+          // First-wins: prevent duplicate meta key override
+          if (!(key in doc.meta)) {
+            doc.meta[key] = val;
+            metaFieldCount++;
+          }
         }
         continue;
       }
@@ -505,10 +508,10 @@ function sanitizeFilename(name) {
 
 /** Constant-time string comparison to prevent timing side-channels on checksum validation. */
 function timingSafeEqual(a, b) {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  const len = Math.max(a.length, b.length);
+  let result = a.length === b.length ? 0 : 1;
+  for (let i = 0; i < len; i++) {
+    result |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
   }
   return result === 0;
 }

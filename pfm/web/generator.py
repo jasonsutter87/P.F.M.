@@ -376,11 +376,16 @@ function renderSections(sections) {
     const bytes = new TextEncoder().encode(s.content).length;
     const sizeStr = bytes > 1024 ? (bytes / 1024).toFixed(1) + ' KB' : bytes + ' B';
     const cls = i === activeIndex ? ' active' : '';
-    html += '<div class="section-item' + cls + '" onclick="selectSection(' + i + ')">' +
+    html += '<div class="section-item' + cls + '" data-idx="' + i + '">' +
             '<div class="section-name">' + esc(s.name) + '</div>' +
             '<div class="section-size">' + sizeStr + '</div></div>';
   }
   el.innerHTML = html;
+  el.querySelectorAll('.section-item').forEach(function(item) {
+    item.addEventListener('click', function() {
+      selectSection(parseInt(this.getAttribute('data-idx'), 10));
+    });
+  });
 }
 
 function selectSection(idx) {

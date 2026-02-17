@@ -108,6 +108,8 @@ class PFMReader:
     def parse(cls, data: bytes) -> PFMDocument:
         """Parse bytes into a PFMDocument."""
         text = data.decode("utf-8")
+        # Normalize CRLF/CR to LF to handle Windows line endings
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
         lines = text.split("\n")
 
         doc = PFMDocument()
@@ -165,14 +167,18 @@ class PFMReader:
                     key = key.strip()
                     val = val.strip()
                     if key in META_ALLOWLIST:
-                        setattr(doc, key, val)
+                        # First-wins: prevent duplicate meta key override
+                        if not getattr(doc, key, ""):
+                            setattr(doc, key, val)
                     else:
-                        # PFM-014: Enforce custom meta field count limit
-                        if len(doc.custom_meta) >= MAX_META_FIELDS:
-                            raise ValueError(
-                                f"Maximum custom meta fields exceeded: {MAX_META_FIELDS}"
-                            )
-                        doc.custom_meta[key] = val
+                        # First-wins: only set if key not already present
+                        if key not in doc.custom_meta:
+                            # PFM-014: Enforce custom meta field count limit
+                            if len(doc.custom_meta) >= MAX_META_FIELDS:
+                                raise ValueError(
+                                    f"Maximum custom meta fields exceeded: {MAX_META_FIELDS}"
+                                )
+                            doc.custom_meta[key] = val
                 i += 1
                 continue
 
@@ -277,8 +283,11 @@ class PFMReaderHandle:
             if current_section == "meta" and ": " in line:
                 key, val = line.split(": ", 1)
                 key = key.strip()
+                # First-wins: prevent duplicate meta key override (e.g., checksum)
+                if key in self.meta:
+                    continue
                 # Enforce meta field count limit (PFM-014: prevents DoS from crafted files)
-                if key not in self.meta and len(self.meta) >= MAX_META_FIELDS:
+                if len(self.meta) >= MAX_META_FIELDS:
                     continue
                 self.meta[key] = val.strip()
 
@@ -383,16 +392,23 @@ class PFMReaderHandle:
 
         # Checksum is computed from UNESCAPED section content strings
         # (without trailing newline), matching PFMDocument.compute_checksum().
-        h = hashlib.sha256()
+        # Sort by offset to ensure consistent order regardless of how
+        # the index was parsed (trailing index reads in reverse).
+        all_entries = []
         for name in self.index.section_names:
             for offset, length in self.index.get_all(name):
-                chunk = self._read_raw(offset, length)
-                # Strip the trailing newline that the writer appends
-                if chunk.endswith(b"\n"):
-                    chunk = chunk[:-1]
-                # Unescape before checksumming (checksum covers original content)
-                unescaped = unescape_content(chunk.decode("utf-8")).encode("utf-8")
-                h.update(unescaped)
+                all_entries.append((offset, length))
+        all_entries.sort()
+
+        h = hashlib.sha256()
+        for offset, length in all_entries:
+            chunk = self._read_raw(offset, length)
+            # Strip the trailing newline that the writer appends
+            if chunk.endswith(b"\n"):
+                chunk = chunk[:-1]
+            # Unescape before checksumming (checksum covers original content)
+            unescaped = unescape_content(chunk.decode("utf-8")).encode("utf-8")
+            h.update(unescaped)
         return _hmac.compare_digest(h.hexdigest(), expected)
 
     def close(self) -> None:
