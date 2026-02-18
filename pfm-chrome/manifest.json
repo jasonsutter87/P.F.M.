@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "PFM — AI Conversation Capture",
-  "version": "1.0.0",
-  "description": "Capture AI conversations (ChatGPT, Claude, Gemini) as .pfm files. View and convert .pfm files in-browser.",
+  "version": "1.1.0",
+  "description": "Capture AI conversations (ChatGPT, Claude, Gemini, Grok, OpenClaw) as .pfm files. View and convert .pfm files in-browser.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -40,6 +40,23 @@
         "https://gemini.google.com/*"
       ],
       "js": ["shared/pfm-core.js", "content/scraper-gemini.js", "content/content-main.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://grok.com/*",
+        "https://grok.x.ai/*",
+        "https://x.com/i/grok*"
+      ],
+      "js": ["shared/pfm-core.js", "content/scraper-grok.js", "content/content-main.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://openclaw.ai/*",
+        "https://*.openclaw.ai/*"
+      ],
+      "js": ["shared/pfm-core.js", "content/scraper-moltbot.js", "content/content-main.js"],
       "run_at": "document_idle"
     }
   ],

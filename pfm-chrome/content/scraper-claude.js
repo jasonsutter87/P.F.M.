@@ -5,60 +5,68 @@
 const ScraperClaude = {
   platform: 'claude',
 
-  /** CSS selector fallbacks — ordered by stability */
+  /**
+   * CSS selector fallbacks — ordered by likelihood of matching.
+   * Claude.ai uses Tailwind utility classes; the custom font-family
+   * classes (.font-user-message / .font-claude-message) have been
+   * the most stable identifiers across UI updates.
+   */
   selectors: {
-    messageGroup: [
-      '[data-testid="conversation-turn"]',
-      '.font-claude-message',
-      '[class*="ConversationItem"]',
-      '.prose'
-    ],
-    humanMessage: [
+    userTurn: [
+      '.font-user-message',
+      '[data-testid="user-message"]',
       '[data-testid="human-turn"]',
       '[class*="human-turn"]',
-      '.font-user-message'
+      '[class*="user-message"]',
+      '[class*="UserMessage"]'
     ],
-    assistantMessage: [
+    assistantTurn: [
+      '.font-claude-message',
       '[data-testid="assistant-turn"]',
       '[class*="assistant-turn"]',
-      '.font-claude-message'
+      '[class*="claude-message"]',
+      '[class*="AssistantMessage"]'
     ],
-    humanContent: [
-      '[data-testid="human-turn"] .whitespace-pre-wrap',
-      '[data-testid="human-turn"] p',
-      '.font-user-message p'
+    userContent: [
+      '[data-testid="user-message"]',
+      '.whitespace-pre-wrap',
+      'p',
+      'div'
     ],
     assistantContent: [
-      '[data-testid="assistant-turn"] .grid-cols-1',
-      '[data-testid="assistant-turn"] .prose',
-      '.font-claude-message .prose',
-      '[class*="markdown"]'
+      '.grid-cols-1',
+      '.prose',
+      '[class*="markdown"]',
+      'div[class*="grid"]',
+      'div'
     ],
     conversationTitle: [
+      '[data-testid="chat-title-button"]',
       'button[data-testid="chat-title"]',
+      '[data-testid="chat-menu-trigger"]',
       'h2',
       '[class*="ConversationTitle"]'
     ],
     modelBadge: [
       '[data-testid="model-selector"]',
       'button[class*="model"]',
-      '[class*="ModelBadge"]'
+      '[class*="ModelBadge"]',
+      '[class*="model-selector"]'
     ]
   },
 
+  /** Try multiple selectors against parent; return first hit */
   query(parent, selectorList, all) {
     for (const sel of selectorList) {
       try {
         const result = all ? parent.querySelectorAll(sel) : parent.querySelector(sel);
         if (all ? result.length > 0 : result) return result;
-      } catch (_) { /* skip */ }
+      } catch (_) { /* invalid selector, skip */ }
     }
     return all ? [] : null;
   },
 
-  /** Maximum total content size (10 MB) to prevent memory exhaustion */
   MAX_CONTENT_SIZE: 10 * 1024 * 1024,
-  /** Maximum message count per conversation */
   MAX_MESSAGES: 5000,
 
   detect() {
@@ -69,16 +77,19 @@ const ScraperClaude = {
     const messages = [];
     let totalSize = 0;
 
-    // Strategy 1: Look for explicit human/assistant turns
-    const humanTurns = this.query(document, this.selectors.humanMessage, true);
-    const assistantTurns = this.query(document, this.selectors.assistantMessage, true);
+    // ----------------------------------------------------------
+    // Strategy 1: .font-user-message / .font-claude-message
+    // These Tailwind utility classes are the most reliable
+    // identifiers on the current Claude.ai UI.
+    // ----------------------------------------------------------
+    const userTurns = this.query(document, this.selectors.userTurn, true);
+    const assistantTurns = this.query(document, this.selectors.assistantTurn, true);
 
-    if (humanTurns.length > 0 || assistantTurns.length > 0) {
-      // Collect all turns with position info for ordering
+    if (userTurns.length > 0 || assistantTurns.length > 0) {
       const allTurns = [];
 
-      for (const el of humanTurns) {
-        const content = this.query(el, this.selectors.humanContent, false);
+      for (const el of userTurns) {
+        const content = this.query(el, this.selectors.userContent, false);
         const text = (content || el).innerText.trim();
         if (text) allTurns.push({ el, role: 'user', content: text });
       }
@@ -89,7 +100,7 @@ const ScraperClaude = {
         if (text) allTurns.push({ el, role: 'assistant', content: text });
       }
 
-      // Sort by DOM order
+      // Sort by DOM position
       allTurns.sort((a, b) => {
         const pos = a.el.compareDocumentPosition(b.el);
         return pos & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
@@ -103,19 +114,53 @@ const ScraperClaude = {
       }
     }
 
-    // Strategy 2: Fallback — look for alternating message blocks
+    // ----------------------------------------------------------
+    // Strategy 2: data-testid based selectors
+    // Older/alternate Claude UI variants use data-testid attrs.
+    // ----------------------------------------------------------
     if (messages.length === 0) {
-      const groups = this.query(document, this.selectors.messageGroup, true);
-      let isUser = true;
-      for (const group of groups) {
-        if (messages.length >= this.MAX_MESSAGES) break;
-        const text = group.innerText.trim();
-        if (text) {
-          totalSize += text.length;
-          if (totalSize > this.MAX_CONTENT_SIZE) break;
-          messages.push({ role: isUser ? 'user' : 'assistant', content: text });
-          isUser = !isUser;
+      const testIdTurns = document.querySelectorAll(
+        '[data-testid="conversation-turn"], [data-testid*="turn"]'
+      );
+      if (testIdTurns.length > 0) {
+        for (const turn of testIdTurns) {
+          if (messages.length >= this.MAX_MESSAGES) break;
+          const isUser = turn.matches('[data-testid*="human"], [data-testid*="user"]') ||
+                         !!turn.querySelector('[data-testid*="human"], [data-testid*="user"]');
+          const text = turn.innerText.trim();
+          if (text) {
+            totalSize += text.length;
+            if (totalSize > this.MAX_CONTENT_SIZE) break;
+            messages.push({ role: isUser ? 'user' : 'assistant', content: text });
+          }
         }
+      }
+    }
+
+    // ----------------------------------------------------------
+    // Strategy 3: Walk the main content area looking for message
+    // blocks by structural patterns (last resort).
+    // ----------------------------------------------------------
+    if (messages.length === 0) {
+      // Look for the main scrollable conversation container
+      const candidates = document.querySelectorAll(
+        'main [class*="flex"][class*="col"], [role="main"] [class*="flex"][class*="col"], [class*="conversation"] > div'
+      );
+      for (const container of candidates) {
+        const children = container.children;
+        if (children.length < 2) continue;
+        let isUser = true;
+        for (const child of children) {
+          if (messages.length >= this.MAX_MESSAGES) break;
+          const text = child.innerText.trim();
+          if (text && text.length > 1) {
+            totalSize += text.length;
+            if (totalSize > this.MAX_CONTENT_SIZE) break;
+            messages.push({ role: isUser ? 'user' : 'assistant', content: text });
+            isUser = !isUser;
+          }
+        }
+        if (messages.length > 0) break;
       }
     }
 
@@ -125,8 +170,10 @@ const ScraperClaude = {
     let title = 'Claude Conversation';
     const titleEl = this.query(document, this.selectors.conversationTitle, false);
     if (titleEl) {
-      const t = titleEl.innerText.trim();
-      if (t && t.length < 200) title = t;
+      // The title button often has nested elements; grab deepest text
+      const truncEl = titleEl.querySelector('.truncate') || titleEl;
+      const t = truncEl.innerText.trim();
+      if (t && t.length > 0 && t.length < 200) title = t;
     }
 
     // Model

@@ -18,6 +18,8 @@
     if (typeof ScraperChatGPT !== 'undefined' && ScraperChatGPT.detect()) return ScraperChatGPT;
     if (typeof ScraperClaude !== 'undefined' && ScraperClaude.detect()) return ScraperClaude;
     if (typeof ScraperGemini !== 'undefined' && ScraperGemini.detect()) return ScraperGemini;
+    if (typeof ScraperGrok !== 'undefined' && ScraperGrok.detect()) return ScraperGrok;
+    if (typeof ScraperMoltbot !== 'undefined' && ScraperMoltbot.detect()) return ScraperMoltbot;
     return null;
   }
 
@@ -197,14 +199,29 @@
         '.text-base'
       ],
       claude: [
+        '.font-user-message',
+        '.font-claude-message',
+        '[data-testid="user-message"]',
         '[data-testid="conversation-turn"]',
-        '[data-testid="human-turn"]',
-        '.font-claude-message'
+        '[data-testid="human-turn"]'
       ],
       gemini: [
         'message-content',
         '.user-query',
         '.model-response-text'
+      ],
+      grok: [
+        '.message-bubble',
+        '[class*="message-content"]',
+        '.response-content-markdown',
+        '[data-message-type]'
+      ],
+      moltbot: [
+        '[data-role="user"]',
+        '[data-role="assistant"]',
+        '.aui-user-message',
+        'message-item',
+        'chat-message'
       ]
     };
 

@@ -16,6 +16,72 @@
     });
   });
 
+  // ===== Supported hosts =====
+  const KNOWN_HOSTS = [
+    'chat.openai.com', 'chatgpt.com',
+    'claude.ai',
+    'gemini.google.com',
+    'grok.com', 'grok.x.ai',
+    'openclaw.ai'
+  ];
+
+  /** Check if a URL is on a known supported host */
+  function isKnownHost(url) {
+    try {
+      const hostname = new URL(url).hostname;
+      return KNOWN_HOSTS.some(h => hostname === h || hostname.endsWith('.' + h));
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /** Check if URL is x.com/i/grok (special case: host match + path) */
+  function isGrokOnX(url) {
+    try {
+      const u = new URL(url);
+      return u.hostname === 'x.com' && u.pathname.startsWith('/i/grok');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /**
+   * Programmatically inject content scripts into the active tab.
+   * Used when the tab's URL isn't in the manifest's content_scripts
+   * matches (e.g., self-hosted Moltbot/OpenClaw instances).
+   */
+  async function injectContentScripts(tabId) {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: [
+        'shared/pfm-core.js',
+        'content/scraper-chatgpt.js',
+        'content/scraper-claude.js',
+        'content/scraper-gemini.js',
+        'content/scraper-grok.js',
+        'content/scraper-moltbot.js',
+        'content/content-main.js'
+      ]
+    });
+    // Give the content script a moment to initialize
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  /**
+   * Try to send a capture message to the content script.
+   * If it fails (content script not injected), inject and retry.
+   */
+  async function captureFromTab(tab) {
+    try {
+      const response = await chrome.tabs.sendMessage(tab.id, { action: 'capture_conversation' });
+      return response;
+    } catch (_) {
+      // Content script not present — inject programmatically and retry
+      await injectContentScripts(tab.id);
+      return await chrome.tabs.sendMessage(tab.id, { action: 'capture_conversation' });
+    }
+  }
+
   // ===== Capture =====
   $('btn-capture').addEventListener('click', async () => {
     const btn = $('btn-capture');
@@ -30,24 +96,17 @@
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab) throw new Error('No active tab');
 
-      // Check if we're on a supported site
       const url = tab.url || '';
-      const supported = [
-        'chat.openai.com', 'chatgpt.com',
-        'claude.ai',
-        'gemini.google.com'
-      ];
-      const isSupported = supported.some(host => {
-        try { return new URL(url).hostname === host; }
-        catch (_) { return false; }
-      });
+      const supported = isKnownHost(url) || isGrokOnX(url);
 
-      if (!isSupported) {
-        throw new Error('Navigate to ChatGPT, Claude, or Gemini first');
+      // For unknown hosts, we'll still try via programmatic injection
+      // (handles self-hosted Moltbot/OpenClaw)
+      if (!supported && !url.startsWith('https://') && !url.startsWith('http://')) {
+        throw new Error('Navigate to an AI chat page first');
       }
 
-      // Send message to content script
-      const response = await chrome.tabs.sendMessage(tab.id, { action: 'capture_conversation' });
+      // Send message to content script (with fallback injection)
+      const response = await captureFromTab(tab);
 
       if (response.error) {
         throw new Error(response.error);
