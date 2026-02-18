@@ -3,9 +3,11 @@
  * them correctly when the package.json has "type": "module".
  */
 import { readdirSync, renameSync, readFileSync, writeFileSync } from 'fs';
-import { join, extname } from 'path';
+import { join, extname, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-const dir = new URL('../dist/cjs', import.meta.url).pathname;
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const dir = join(__dirname, '..', 'dist', 'cjs');
 
 function walk(d) {
   for (const entry of readdirSync(d, { withFileTypes: true })) {

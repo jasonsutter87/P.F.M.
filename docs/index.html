@@ -82,8 +82,7 @@ input { font-family: inherit; }
   text-align: center;
   transition: opacity var(--transition);
 }
-#landing::before,
-#landing::after {
+#landing::before {
   content: '';
   flex: 1;
 }
@@ -177,8 +176,8 @@ input { font-family: inherit; }
 }
 
 .landing-footer {
-  position: absolute;
-  bottom: 24px;
+  margin-top: auto;
+  padding-top: 24px;
   font-size: 12px;
   color: var(--text-dim);
 }
@@ -294,6 +293,8 @@ input { font-family: inherit; }
   min-height: 48px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
 }
 .topbar-brand {
   font-weight: 700;
@@ -315,6 +316,8 @@ input { font-family: inherit; }
   color: var(--text-muted);
   font-size: 12px;
   transition: all var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 a.topbar-btn { text-decoration: none; }
 .topbar-btn:hover {
@@ -520,6 +523,11 @@ a.topbar-btn { text-decoration: none; }
 .content-pre.wrap {
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+.content-pre mark {
+  background: var(--accent);
+  color: #000;
+  border-radius: 2px;
 }
 
 /* Line numbers gutter */
@@ -913,6 +921,11 @@ a.topbar-btn { text-decoration: none; }
 @media (max-width: 600px) {
   .layout { flex-direction: column; }
   .sidebar { width: 100%; min-width: unset; max-height: 45%; border-right: none; border-bottom: 1px solid var(--border); }
+  #btn-shortcuts,
+  #btn-export-csv,
+  #btn-export-txt { display: none; }
+  .topbar { gap: 6px; padding: 0 8px; }
+  .topbar-btn { padding: 4px 8px; font-size: 11px; }
 }
 </style>
 </head>
@@ -1001,7 +1014,7 @@ a.topbar-btn { text-decoration: none; }
         <span class="eco-cmd">pfm</span>
       </span>
     </a>
-    <a class="eco-card" href="https://github.com/jasonsutter87/P.F.M.-Pure-Fucking-Magic-" target="_blank" rel="noopener">
+    <a class="eco-card" href="https://github.com/jasonsutter87/P.F.M." target="_blank" rel="noopener">
       <span class="eco-icon">&#x1F4BB;</span>
       <span class="eco-info">
         <span class="eco-label">GitHub</span>
@@ -1036,14 +1049,14 @@ a.topbar-btn { text-decoration: none; }
   </div>
 
   <div class="landing-footer">
-    <a href="https://github.com/jasonsutter87/P.F.M.-Pure-Fucking-Magic-">PFM</a> &mdash; Pure Fucking Magic. AI agent output container format.
+    <a href="https://github.com/jasonsutter87/P.F.M.">PFM</a> &mdash; Pure Fucking Magic. AI agent output container format.
   </div>
 </div>
 
 <!-- ========== VIEWER ========== -->
 <div id="viewer">
   <div class="topbar">
-    <span class="topbar-brand">PFM</span>
+    <span class="topbar-brand">/PFM</span>
     <span class="topbar-filename" id="v-filename"></span>
     <span class="topbar-spacer"></span>
     <button class="topbar-btn" id="btn-shortcuts" title="Keyboard shortcuts">&#9000; Shortcuts</button>
@@ -1052,7 +1065,7 @@ a.topbar-btn { text-decoration: none; }
     <button class="topbar-btn" id="btn-export-csv">CSV</button>
     <button class="topbar-btn" id="btn-export-txt">TXT</button>
     <button class="topbar-btn" id="btn-theme">Theme</button>
-    <a class="topbar-btn" href="https://github.com/jasonsutter87/P.F.M.-Pure-Fucking-Magic-" target="_blank" rel="noopener">GitHub</a>
+    <a class="topbar-btn" href="https://github.com/jasonsutter87/P.F.M." target="_blank" rel="noopener">GitHub</a>
     <button class="topbar-btn primary" id="btn-open-new">Open File</button>
   </div>
 
@@ -1103,7 +1116,7 @@ a.topbar-btn { text-decoration: none; }
 <!-- ========== CONVERTER RESULT ========== -->
 <div id="converter">
   <div class="topbar">
-    <span class="topbar-brand">PFM</span>
+    <span class="topbar-brand">/PFM</span>
     <span class="topbar-filename" id="c-filename"></span>
     <span class="topbar-spacer"></span>
     <button class="topbar-btn" id="btn-convert-view" title="Open in viewer">View in Viewer</button>
@@ -1155,11 +1168,11 @@ a.topbar-btn { text-decoration: none; }
 <!-- ========== BENCHMARKS PAGE ========== -->
 <div id="page-benchmarks" class="page-screen">
   <div class="topbar">
-    <a class="topbar-brand" href="#" style="text-decoration:none;">PFM</a>
+    <a class="topbar-brand" href="#" style="text-decoration:none;" onclick="showLanding(); window.location.hash=''; return false;">/PFM</a>
     <span class="topbar-filename">Benchmarks</span>
     <span class="topbar-spacer"></span>
     <button class="topbar-btn" id="btn-theme-bench" onclick="toggleTheme()">Theme</button>
-    <a class="topbar-btn" href="#">Home</a>
+    <a class="topbar-btn" href="#" onclick="showLanding(); window.location.hash=''; return false;">Home</a>
   </div>
   <div class="page-body">
     <div class="page-inner">
@@ -1287,11 +1300,11 @@ a.topbar-btn { text-decoration: none; }
 <!-- ========== AUDITS PAGE ========== -->
 <div id="page-audits" class="page-screen">
   <div class="topbar">
-    <a class="topbar-brand" href="#" style="text-decoration:none;">PFM</a>
+    <a class="topbar-brand" href="#" style="text-decoration:none;" onclick="showLanding(); window.location.hash=''; return false;">/PFM</a>
     <span class="topbar-filename">Security Audits</span>
     <span class="topbar-spacer"></span>
     <button class="topbar-btn" onclick="toggleTheme()">Theme</button>
-    <a class="topbar-btn" href="#">Home</a>
+    <a class="topbar-btn" href="#" onclick="showLanding(); window.location.hash=''; return false;">Home</a>
   </div>
   <div class="page-body">
     <div class="page-inner">
@@ -1421,11 +1434,11 @@ a.topbar-btn { text-decoration: none; }
 <!-- ========== TOS PAGE ========== -->
 <div id="page-tos" class="page-screen">
   <div class="topbar">
-    <a class="topbar-brand" href="#" style="text-decoration:none;">PFM</a>
+    <a class="topbar-brand" href="#" style="text-decoration:none;" onclick="showLanding(); window.location.hash=''; return false;">/PFM</a>
     <span class="topbar-filename">Terms of Service</span>
     <span class="topbar-spacer"></span>
     <button class="topbar-btn" onclick="toggleTheme()">Theme</button>
-    <a class="topbar-btn" href="#">Home</a>
+    <a class="topbar-btn" href="#" onclick="showLanding(); window.location.hash=''; return false;">Home</a>
   </div>
   <div class="page-body">
     <div class="page-inner">
@@ -1909,7 +1922,22 @@ function renderContent() {
   const nums = contentLines.map((_, i) => i + 1).join('\n');
   const wrapClass = state.wordWrap ? ' wrap' : '';
 
-  body.innerHTML = `<div class="code-container"><pre class="line-numbers">${nums}</pre><pre class="content-pre${wrapClass}">${esc(s.content)}</pre></div>`;
+  // Highlight search matches if there's an active query
+  const query = $('v-search').value.toLowerCase().trim();
+  let escaped = esc(s.content);
+  if (query) {
+    const escapedQuery = esc(query);
+    const re = new RegExp('(' + escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    escaped = escaped.replace(re, '<mark>$1</mark>');
+  }
+
+  body.innerHTML = `<div class="code-container"><pre class="line-numbers">${nums}</pre><pre class="content-pre${wrapClass}">${escaped}</pre></div>`;
+
+  // Scroll first match into view
+  if (query) {
+    const firstMark = body.querySelector('mark');
+    if (firstMark) firstMark.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
 }
 
 function selectSection(idx) {
@@ -2676,6 +2704,8 @@ function handleRoute() {
     loadDemo();
   } else if (['benchmarks', 'audits', 'tos'].includes(hash)) {
     showPage(hash);
+  } else if (!hash) {
+    showLanding();
   }
 }
 window.addEventListener('hashchange', handleRoute);

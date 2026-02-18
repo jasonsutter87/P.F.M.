@@ -39,7 +39,7 @@
     "container",
     "llm"
   ],
-  "author": "",
+  "author": "Jason Sutter",
   "license": "MIT",
   "repository": {
     "type": "git",
