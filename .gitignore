@@ -8,3 +8,5 @@ build/
 JASON_READ_THIS.md
 Visionary_GTM_strateg_for_PFM/
 security_tests/
+*.pem
+*.crx
