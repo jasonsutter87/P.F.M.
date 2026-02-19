@@ -190,7 +190,7 @@ input { font-family: inherit; }
 /* Ecosystem cards */
 .ecosystem {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-top: 32px;
   max-width: 640px;
@@ -923,7 +923,9 @@ a.topbar-btn { text-decoration: none; }
   #btn-export-txt { display: none; }
   .topbar { gap: 6px; padding: 0 8px; }
   .topbar-btn { padding: 4px 8px; font-size: 11px; }
-  .ecosystem { grid-template-columns: 1fr 1fr; }
+}
+@media (min-width: 769px) {
+  .ecosystem { grid-template-columns: repeat(3, 1fr); }
 }
 </style>
 </head>
