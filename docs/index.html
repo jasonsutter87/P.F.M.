@@ -189,13 +189,12 @@ input { font-family: inherit; }
 
 /* Ecosystem cards */
 .ecosystem {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-top: 32px;
   max-width: 640px;
   width: 100%;
-  flex-wrap: wrap;
-  justify-content: center;
 }
 .eco-card {
   display: flex;
@@ -208,8 +207,6 @@ input { font-family: inherit; }
   text-decoration: none;
   color: var(--text);
   transition: all var(--transition);
-  min-width: 180px;
-  flex: 1;
 }
 .eco-card:hover {
   border-color: var(--accent);
@@ -589,7 +586,6 @@ a.topbar-btn { text-decoration: none; }
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
 }
 .mode-tab {
   flex: 1;
