@@ -25,7 +25,7 @@ import { validateChecksum } from './checksum.js';
 import { toJSON, fromJSON, toMarkdown } from './convert.js';
 import type { PFMDocument } from './types.js';
 
-const VERSION = '0.1.3';
+const VERSION = '0.1.4';
 
 function printUsage(): void {
   console.log('PFM - Pure Fucking Magic');
@@ -228,17 +228,53 @@ async function cmdValidate(args: string[]): Promise<void> {
   }
 }
 
+function inferFormat(filename: string): string | undefined {
+  const ext = extname(filename).toLowerCase();
+  const map: Record<string, string> = { '.json': 'json', '.md': 'md', '.markdown': 'md', '.txt': 'txt', '.csv': 'csv', '.pfm': 'pfm' };
+  return map[ext];
+}
+
 async function cmdConvert(args: string[]): Promise<void> {
   if (hasFlag(args, '--help', '-h')) {
-    console.log('Usage: pfm convert <to|from> <json|md> <input> [-o output]');
+    console.log('Usage: pfm convert <to|from> [format] <input> [-o output]');
+    console.log();
+    console.log('Format is auto-detected from file extension if omitted.');
+    console.log('  pfm convert from test.json           # infers json');
+    console.log('  pfm convert to json report.pfm       # explicit');
     return;
   }
   const pos = getPositional(args);
-  if (pos.length < 3) {
-    console.error('Usage: pfm convert <to|from> <json|md> <input> [-o output]');
+  if (pos.length < 2) {
+    console.error('Usage: pfm convert <to|from> [format] <input> [-o output]');
+    console.error('Format is auto-detected from file extension if omitted.');
     process.exit(1);
   }
-  const [direction, format, input] = pos;
+
+  let direction: string, format: string, input: string;
+  const formats = new Set(['json', 'md', 'txt', 'csv']);
+
+  if (pos.length >= 3 && formats.has(pos[1])) {
+    // Explicit: pfm convert from json test.json
+    [direction, format, input] = pos;
+  } else {
+    // Inferred: pfm convert from test.json  OR  pfm convert to report.pfm -o out.json
+    direction = pos[0];
+    input = pos[1];
+    const output = getFlag(args, '--output', '-o');
+    const inferred = inferFormat(input);
+    const inferredFromOutput = output ? inferFormat(output) : undefined;
+    // For "to": infer from -o flag since input is .pfm
+    // For "from": infer from input file extension
+    const resolved = (direction === 'to' && inferredFromOutput && inferredFromOutput !== 'pfm')
+      ? inferredFromOutput
+      : inferred;
+    if (!resolved || resolved === 'pfm') {
+      console.error(`Cannot infer format. Specify explicitly: pfm convert ${direction} <json|md> ${input}`);
+      process.exit(1);
+    }
+    format = resolved;
+  }
+
   const output = getFlag(args, '--output', '-o');
 
   if (direction === 'to') {

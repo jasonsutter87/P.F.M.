@@ -161,17 +161,42 @@ def cmd_validate(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def _infer_format(filename: str) -> str | None:
+    """Infer format from file extension."""
+    ext_map = {".json": "json", ".csv": "csv", ".txt": "txt", ".md": "md", ".markdown": "md", ".pfm": "pfm"}
+    return ext_map.get(Path(filename).suffix.lower())
+
+
 def cmd_convert(args: argparse.Namespace) -> None:
     """Convert to/from PFM."""
     from pfm.reader import PFMReader
     from pfm.converters import convert_to, convert_from
     from pfm.spec import MAX_FILE_SIZE
 
+    known_formats = {"json", "csv", "txt", "md"}
+
+    # Resolve format and input: either explicit (pfm convert from json file) or inferred (pfm convert from file)
+    if args.format_or_input in known_formats and args.input:
+        fmt = args.format_or_input
+        input_file = args.input
+    else:
+        input_file = args.format_or_input
+        inferred = _infer_format(input_file)
+        inferred_from_output = _infer_format(args.output) if args.output else None
+        # For "to": infer from -o flag since input is .pfm
+        # For "from": infer from input file extension
+        resolved = (inferred_from_output if args.direction == "to" and inferred_from_output and inferred_from_output != "pfm" else inferred)
+        if not resolved or resolved == "pfm":
+            print(f"Error: Cannot infer format. Specify explicitly:", file=sys.stderr)
+            print(f"  pfm convert {args.direction} <json|csv|txt|md> {input_file}", file=sys.stderr)
+            sys.exit(1)
+        fmt = resolved
+
     if args.direction == "from":
         # Convert other format -> PFM
-        input_path = Path(args.input)
+        input_path = Path(input_file)
         if not input_path.is_file():
-            print(f"Error: File not found: {args.input}", file=sys.stderr)
+            print(f"Error: File not found: {input_file}", file=sys.stderr)
             sys.exit(1)
         file_size = input_path.stat().st_size
         if file_size > MAX_FILE_SIZE:
@@ -181,26 +206,26 @@ def cmd_convert(args: argparse.Namespace) -> None:
             )
             sys.exit(1)
         data = input_path.read_text(encoding="utf-8")
-        doc = convert_from(data, args.format)
-        output = args.output or Path(args.input).stem + ".pfm"
+        doc = convert_from(data, fmt)
+        output = args.output or Path(input_file).stem + ".pfm"
         # Reject path traversal in output path
         if ".." in Path(output).parts:
             print("Error: Output path must not contain '..' (path traversal)", file=sys.stderr)
             sys.exit(1)
         nbytes = doc.write(output)
-        print(f"Converted {args.input} -> {output} ({nbytes} bytes)")
+        print(f"Converted {input_file} -> {output} ({nbytes} bytes)")
 
     elif args.direction == "to":
         # Convert PFM -> other format
-        doc = PFMReader.read(args.input)
-        result = convert_to(doc, args.format)
+        doc = PFMReader.read(input_file)
+        result = convert_to(doc, fmt)
         if args.output:
             # Reject path traversal in output path
             if ".." in Path(args.output).parts:
                 print("Error: Output path must not contain '..' (path traversal)", file=sys.stderr)
                 sys.exit(1)
             Path(args.output).write_text(result, encoding="utf-8")
-            print(f"Converted {args.input} -> {args.output}")
+            print(f"Converted {input_file} -> {args.output}")
         else:
             print(result, end="")
 
@@ -478,8 +503,8 @@ def main() -> None:
     # convert
     p_convert = sub.add_parser("convert", help="Convert to/from PFM")
     p_convert.add_argument("direction", choices=["to", "from"], help="Conversion direction")
-    p_convert.add_argument("format", choices=["json", "csv", "txt", "md"], help="Target/source format")
-    p_convert.add_argument("input", help="Input file path")
+    p_convert.add_argument("format_or_input", help="Format (json, csv, txt, md) or input file")
+    p_convert.add_argument("input", nargs="?", default=None, help="Input file path")
     p_convert.add_argument("-o", "--output", help="Output file path")
 
     # view
