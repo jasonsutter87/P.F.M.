@@ -351,6 +351,85 @@ def cmd_verify(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def cmd_spells(args: argparse.Namespace) -> None:
+    """List all available PFM spells."""
+    print("PFM Spells")
+    print("Aliased API with Harry Potter spell names.\n")
+    print("  accio <file> <section>           Summon a section from a .pfm file")
+    print("                                   (alias for: pfm read)")
+    print()
+    print("  polyjuice <file> <format>        Transform to another format (json, csv, txt, md)")
+    print("                                   (alias for: pfm convert to <format>)")
+    print()
+    print("  fidelius <file> [-p password]     Cast the Fidelius Charm — encrypt a document")
+    print("                                   (alias for: pfm encrypt)")
+    print()
+    print("  revelio <file> [-p password]      Reveal hidden contents — decrypt a document")
+    print("                                   (alias for: pfm decrypt)")
+    print()
+    print("  unbreakable-vow <file> [-s key]   Make an Unbreakable Vow — sign a document")
+    print("                                   (alias for: pfm sign)")
+    print()
+    print("  vow-kept <file> [-s key]          Check if the Vow holds — verify signature")
+    print("                                   (alias for: pfm verify)")
+    print()
+    print("  prior-incantato <file>            Reveal history and integrity of a document")
+    print("                                   (alias for: pfm validate)")
+    print()
+    print("Usage:")
+    print("  pfm accio report.pfm content")
+    print("  pfm polyjuice report.pfm json -o report.json")
+    print("  pfm fidelius report.pfm -p mypassword")
+    print("  pfm revelio report.pfm.enc -p mypassword")
+    print("  pfm unbreakable-vow report.pfm -s mysecret")
+    print("  pfm vow-kept report.pfm -s mysecret")
+    print("  pfm prior-incantato report.pfm")
+    print()
+    print("Python API:")
+    print("  from pfm.spells import accio, polyjuice, fidelius, revelio")
+    print("  content = accio('report.pfm', 'content')")
+
+
+def cmd_accio(args: argparse.Namespace) -> None:
+    """Summon a section from a .pfm file."""
+    cmd_read(args)
+
+
+def cmd_polyjuice(args: argparse.Namespace) -> None:
+    """Transform a .pfm file to another format."""
+    from pfm.reader import PFMReader
+    from pfm.converters import convert_to
+
+    doc = PFMReader.read(args.path)
+    result = convert_to(doc, args.format)
+    if args.output:
+        if ".." in Path(args.output).parts:
+            print("Error: Output path must not contain '..' (path traversal)", file=sys.stderr)
+            sys.exit(1)
+        Path(args.output).write_text(result, encoding="utf-8")
+        print(f"Converted {args.path} -> {args.output}")
+    else:
+        print(result, end="")
+
+
+def cmd_prior_incantato(args: argparse.Namespace) -> None:
+    """Reveal the history and integrity of a document."""
+    from pfm.reader import PFMReader
+    from pfm.spells import prior_incantato
+
+    doc = PFMReader.read(args.path)
+    result = prior_incantato(doc)
+
+    print(f"Prior Incantato: {args.path}\n")
+    print(f"  ID:         {result['id'] or '(none)'}")
+    print(f"  Agent:      {result['agent'] or '(none)'}")
+    print(f"  Model:      {result['model'] or '(none)'}")
+    print(f"  Created:    {result['created'] or '(none)'}")
+    print(f"  Integrity:  {'VALID' if result['integrity'] else 'INVALID'}")
+    print(f"  Signed:     {'Yes (' + result['sig_algo'] + ')' if result['signed'] else 'No'}")
+    print(f"  Fingerprint: {result['fingerprint']}")
+
+
 def cmd_identify(args: argparse.Namespace) -> None:
     """Quick check if a file is PFM format."""
     from pfm.reader import PFMReader
@@ -368,7 +447,8 @@ def main() -> None:
         prog="pfm",
         description="PFM - Pure Fucking Magic. AI agent output container format.",
     )
-    parser.add_argument("--version", action="version", version="pfm 0.1.0")
+    from pfm import __version__
+    parser.add_argument("--version", action="version", version=f"pfm {__version__}")
     sub = parser.add_subparsers(dest="command")
 
     # create
@@ -436,11 +516,82 @@ def main() -> None:
     p_identify = sub.add_parser("identify", help="Quick check if a file is PFM")
     p_identify.add_argument("path", help="Path to file")
 
+    # spells
+    sub.add_parser("spells", help="List all PFM spells (aliased commands)")
+
+    # accio (alias for read)
+    p_accio = sub.add_parser("accio", help="Summon a section from a .pfm file")
+    p_accio.add_argument("path", help="Path to .pfm file")
+    p_accio.add_argument("section", help="Section name to summon")
+
+    # polyjuice (alias for convert to)
+    p_polyjuice = sub.add_parser("polyjuice", help="Transform a .pfm file to another format")
+    p_polyjuice.add_argument("path", help="Path to .pfm file")
+    p_polyjuice.add_argument("format", choices=["json", "csv", "txt", "md"], help="Target format")
+    p_polyjuice.add_argument("-o", "--output", help="Output file path")
+
+    # fidelius (alias for encrypt)
+    p_fidelius = sub.add_parser("fidelius", help="Encrypt a .pfm file (Fidelius Charm)")
+    p_fidelius.add_argument("path", help="Path to .pfm file")
+    p_fidelius.add_argument("-p", "--password", help="Encryption password (prompted if omitted)")
+    p_fidelius.add_argument("-o", "--output", help="Output path (default: <path>.enc)")
+
+    # revelio (alias for decrypt)
+    p_revelio = sub.add_parser("revelio", help="Decrypt an encrypted .pfm file")
+    p_revelio.add_argument("path", help="Path to encrypted file")
+    p_revelio.add_argument("-p", "--password", help="Decryption password (prompted if omitted)")
+    p_revelio.add_argument("-o", "--output", help="Output path")
+
+    # unbreakable-vow (alias for sign)
+    p_vow = sub.add_parser("unbreakable-vow", help="Sign a .pfm file (Unbreakable Vow)")
+    p_vow.add_argument("path", help="Path to .pfm file")
+    p_vow.add_argument("-s", "--secret", help="Signing secret (prompted if omitted)")
+    p_vow.add_argument("-o", "--output", help="Output path (default: overwrite input)")
+
+    # vow-kept (alias for verify)
+    p_vow_kept = sub.add_parser("vow-kept", help="Verify signature (check the Vow)")
+    p_vow_kept.add_argument("path", help="Path to .pfm file")
+    p_vow_kept.add_argument("-s", "--secret", help="Signing secret (prompted if omitted)")
+
+    # prior-incantato (alias for validate, with provenance)
+    p_prior = sub.add_parser("prior-incantato", help="Reveal history and integrity")
+    p_prior.add_argument("path", help="Path to .pfm file")
+
     args = parser.parse_args()
 
     if not args.command:
-        parser.print_help()
-        sys.exit(1)
+        print("PFM - Pure Fucking Magic")
+        print("AI agent output container format.\n")
+        print("Usage:")
+        print("  pfm create -a \"my-agent\" -m \"gpt-4\" -c \"Hello world\" -o output.pfm")
+        print("  pfm inspect output.pfm")
+        print("  pfm read output.pfm content")
+        print("  pfm validate output.pfm")
+        print("  pfm convert to json output.pfm -o output.json")
+        print("  pfm convert from json data.json -o imported.pfm")
+        print("  pfm view output.pfm")
+        print("  pfm encrypt output.pfm -p mypassword")
+        print("  pfm decrypt output.pfm.enc -p mypassword")
+        print("  pfm sign output.pfm -s mysecret")
+        print("  pfm verify output.pfm -s mysecret")
+        print("  pfm identify output.pfm")
+        print()
+        print("Pipe from stdin:")
+        print("  echo \"Hello\" | pfm create -a cli -o hello.pfm")
+        print("  cat report.txt | pfm create -a importer -m gpt-4 -o report.pfm")
+        print()
+        print("Spells (aliased commands):")
+        print("  pfm accio report.pfm content         Summon a section")
+        print("  pfm polyjuice report.pfm json         Transform format")
+        print("  pfm fidelius report.pfm               Encrypt (Fidelius Charm)")
+        print("  pfm revelio report.pfm.enc            Decrypt (Revelio)")
+        print("  pfm unbreakable-vow report.pfm        Sign (Unbreakable Vow)")
+        print("  pfm prior-incantato report.pfm        Integrity + provenance")
+        print()
+        print("Run 'pfm spells' for the full spellbook.")
+        print("Run 'pfm <command> --help' for details on any command.")
+        print("Run 'pfm --version' for version info.")
+        sys.exit(0)
 
     commands = {
         "create": cmd_create,
@@ -454,6 +605,14 @@ def main() -> None:
         "sign": cmd_sign,
         "verify": cmd_verify,
         "identify": cmd_identify,
+        "spells": cmd_spells,
+        "accio": cmd_accio,
+        "polyjuice": cmd_polyjuice,
+        "fidelius": cmd_encrypt,
+        "revelio": cmd_decrypt,
+        "unbreakable-vow": cmd_sign,
+        "vow-kept": cmd_verify,
+        "prior-incantato": cmd_prior_incantato,
     }
 
     commands[args.command](args)

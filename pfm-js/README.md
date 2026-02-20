@@ -2,12 +2,39 @@
 
 JavaScript/TypeScript library for reading, writing, and validating **.pfm** (Pure Fucking Magic) AI agent output files.
 
-Zero dependencies. Works in Node.js 18+ and browsers.
+Zero dependencies. Works in Node.js 18+ and browsers. Includes a full CLI.
 
 ## Install
 
 ```bash
-npm install get-pfm
+npm install get-pfm          # Library only
+npm install -g get-pfm       # Library + CLI (installs `pfm` command)
+```
+
+## CLI
+
+Installing globally gives you the `pfm` command:
+
+```bash
+pfm create -a "my-agent" -m "gpt-4" -c "Hello world" -o output.pfm
+pfm inspect output.pfm
+pfm read output.pfm content
+pfm validate output.pfm
+pfm convert to json output.pfm -o output.json
+pfm identify output.pfm
+
+# Pipe from stdin
+echo "Hello" | pfm create -a cli -o hello.pfm
+```
+
+### Spells
+
+Every command has a Harry Potter spell alias. Run `pfm spells` for the full spellbook.
+
+```bash
+pfm accio report.pfm content            # Summon a section
+pfm polyjuice report.pfm json           # Transform to another format
+pfm prior-incantato report.pfm          # Full provenance + integrity check
 ```
 
 ## Quick Start

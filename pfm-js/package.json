@@ -18,6 +18,10 @@
       }
     }
   },
+  "bin": {
+    "pfm": "./dist/esm/cli.js",
+    "get-pfm": "./dist/esm/cli.js"
+  },
   "files": [
     "dist",
     "README.md",

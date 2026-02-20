@@ -104,8 +104,16 @@ with PFMReader.open("report.pfm") as reader:
 ### CLI
 
 ```bash
+pip install get-pfm      # Python
+npm install -g get-pfm   # Node.js — both install the `pfm` command
+```
+
+```bash
 # Create a .pfm file
 pfm create -a "my-agent" -m "gpt-4" -c "Hello world" -o output.pfm
+
+# Pipe from stdin
+echo "Hello" | pfm create -a cli -o hello.pfm
 
 # Inspect metadata and sections
 pfm inspect output.pfm
@@ -124,6 +132,30 @@ pfm convert to json output.pfm -o output.json
 pfm convert to md output.pfm -o output.md
 pfm convert from json data.json -o imported.pfm
 pfm convert from csv data.csv -o imported.pfm
+```
+
+### Spells
+
+Every CLI command has a Harry Potter spell alias. Run `pfm spells` for the full spellbook.
+
+```bash
+pfm accio report.pfm content            # Summon a section
+pfm polyjuice report.pfm json           # Transform to another format
+pfm fidelius report.pfm                  # Encrypt (Fidelius Charm)
+pfm revelio report.pfm.enc              # Decrypt (Revelio)
+pfm unbreakable-vow report.pfm          # Sign (Unbreakable Vow)
+pfm vow-kept report.pfm                 # Verify signature
+pfm prior-incantato report.pfm          # Full provenance + integrity check
+```
+
+```python
+from pfm.spells import accio, polyjuice, fidelius, revelio, unbreakable_vow
+
+content = accio("report.pfm", "content")
+json_str = polyjuice(doc, "json")
+encrypted = fidelius(doc, "password")
+decrypted = revelio(encrypted, "password")
+unbreakable_vow(doc, "signing-key")
 ```
 
 ### Chrome Extension
@@ -275,12 +307,13 @@ pfm/
 │   ├── stream.py               # Streaming writer for real-time output
 │   ├── converters.py           # JSON, CSV, TXT, Markdown (both directions)
 │   ├── security.py             # HMAC signing, AES-256-GCM encryption
-│   ├── spells.py               # Shortcut factory functions
-│   ├── cli.py                  # Command-line interface
+│   ├── spells.py               # Harry Potter spell aliases (accio, fidelius, etc.)
+│   ├── cli.py                  # Command-line interface (+ spell commands)
+│   ├── __main__.py             # python -m pfm support
 │   ├── tui/                    # Terminal viewer (Textual)
 │   └── web/                    # Web viewer generator + local server
 ├── pfm-js/                     # npm package (TypeScript)
-│   └── src/                    # Parser, serializer, converters, checksum
+│   └── src/                    # Parser, serializer, converters, checksum, CLI
 ├── pfm-vscode/                 # VS Code extension
 │   └── src/                    # Syntax, preview, outline, hover, CodeLens
 ├── pfm-chrome/                 # Chrome extension (MV3)
