@@ -1,6 +1,6 @@
 {
   "name": "get-pfm",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "PFM parser for JavaScript/TypeScript. Read and validate .pfm AI agent output files.",
   "type": "module",
   "main": "./dist/cjs/index.cjs",
@@ -19,8 +19,8 @@
     }
   },
   "bin": {
-    "pfm": "./dist/esm/cli.js",
-    "get-pfm": "./dist/esm/cli.js"
+    "pfm": "dist/esm/cli.js",
+    "get-pfm": "dist/esm/cli.js"
   },
   "files": [
     "dist",
@@ -47,7 +47,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jasonsutter87/P.F.M..git"
+    "url": "git+https://github.com/jasonsutter87/P.F.M..git"
   },
   "devDependencies": {
     "@types/node": "^20.19.33",
