@@ -99,6 +99,168 @@ export function fromJSON(json: string): PFMDocument {
 }
 
 /**
+ * Create a PFM document from plain text.
+ * Wraps the entire text as a single "content" section.
+ */
+export function fromText(text: string): PFMDocument {
+  return {
+    formatVersion: '1.0',
+    isStream: false,
+    meta: { agent: 'text-import', created: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z') },
+    sections: [{ name: 'content', content: text.trim() }],
+  };
+}
+
+/**
+ * Create a PFM document from Markdown.
+ * Parses YAML-style frontmatter for meta, ## headers as sections.
+ * If no headers found, treats entire content as a single "content" section.
+ */
+export function fromMarkdown(md: string): PFMDocument {
+  const meta: Record<string, string> = { agent: 'markdown-import', created: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z') };
+  const sections: { name: string; content: string }[] = [];
+  const lines = md.split('\n');
+  let i = 0;
+
+  // Parse frontmatter
+  if (lines[0]?.trim() === '---') {
+    i = 1;
+    while (i < lines.length && lines[i].trim() !== '---') {
+      const line = lines[i].trim();
+      const colonIdx = line.indexOf(': ');
+      if (colonIdx > 0) {
+        const key = line.slice(0, colonIdx).trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+        const val = line.slice(colonIdx + 2).trim();
+        if (key && val) meta[key] = val;
+      }
+      i++;
+    }
+    i++; // skip closing ---
+  }
+
+  // Parse ## sections
+  let currentSection: string | null = null;
+  let sectionLines: string[] = [];
+  const contentBefore: string[] = [];
+
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.startsWith('## ')) {
+      if (currentSection) {
+        sections.push({ name: currentSection, content: sectionLines.join('\n').trim() });
+      } else {
+        const pre = contentBefore.join('\n').trim();
+        if (pre) sections.push({ name: 'content', content: pre });
+      }
+      const raw = line.slice(3).trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '');
+      currentSection = raw || 'content';
+      sectionLines = [];
+    } else if (currentSection === null) {
+      contentBefore.push(line);
+    } else {
+      sectionLines.push(line);
+    }
+    i++;
+  }
+
+  // Flush last section
+  if (currentSection) {
+    sections.push({ name: currentSection, content: sectionLines.join('\n').trim() });
+  } else {
+    const pre = contentBefore.join('\n').trim();
+    if (pre) sections.push({ name: 'content', content: pre });
+  }
+
+  // Fallback: if no sections, wrap everything
+  if (sections.length === 0) {
+    sections.push({ name: 'content', content: md.trim() });
+  }
+
+  return { formatVersion: '1.0', isStream: false, meta, sections };
+}
+
+/**
+ * Create a PFM document from CSV.
+ * Expects rows of: type, key, value (meta rows and section rows).
+ * If the CSV doesn't follow that schema, wraps raw CSV as content.
+ */
+export function fromCSV(csvText: string): PFMDocument {
+  const lines = csvText.split('\n');
+  if (lines.length < 2) {
+    return fromText(csvText);
+  }
+
+  // Simple CSV parser (handles quoted fields)
+  function parseLine(line: string): string[] {
+    const fields: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let j = 0; j < line.length; j++) {
+      const ch = line[j];
+      if (inQuotes) {
+        if (ch === '"' && line[j + 1] === '"') {
+          current += '"';
+          j++;
+        } else if (ch === '"') {
+          inQuotes = false;
+        } else {
+          current += ch;
+        }
+      } else {
+        if (ch === '"') {
+          inQuotes = true;
+        } else if (ch === ',') {
+          fields.push(current);
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+    }
+    fields.push(current);
+    return fields;
+  }
+
+  // Check if first row looks like a PFM CSV header
+  const header = parseLine(lines[0]);
+  const isPFMCSV = header.length >= 3 &&
+    header[0].trim().toLowerCase() === 'type' &&
+    header[1].trim().toLowerCase() === 'key';
+
+  if (!isPFMCSV) {
+    // Not PFM-structured CSV — wrap as content
+    return {
+      formatVersion: '1.0',
+      isStream: false,
+      meta: { agent: 'csv-import', created: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z') },
+      sections: [{ name: 'content', content: csvText.trim() }],
+    };
+  }
+
+  const meta: Record<string, string> = { agent: 'csv-import', created: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z') };
+  const sections: { name: string; content: string }[] = [];
+
+  for (let r = 1; r < lines.length; r++) {
+    const line = lines[r].trim();
+    if (!line) continue;
+    const row = parseLine(line);
+    if (row.length < 3) continue;
+    const [type, key, value] = row;
+    if (type === 'meta' && key) {
+      meta[key] = value;
+    } else if (type === 'section' && key) {
+      sections.push({ name: key, content: value });
+    }
+  }
+
+  if (sections.length === 0) {
+    sections.push({ name: 'content', content: csvText.trim() });
+  }
+
+  return { formatVersion: '1.0', isStream: false, meta, sections };
+}
+
+/**
  * Convert a PFM document to Markdown.
  *
  * Meta becomes YAML-style frontmatter, sections become ## headers.
@@ -137,4 +299,72 @@ export function toMarkdown(doc: PFMDocument): string {
   }
 
   return parts.join('\n');
+}
+
+/**
+ * Convert a PFM document to plain text.
+ * Section contents with headers, meta as a compact header line.
+ */
+export function toText(doc: PFMDocument): string {
+  const parts: string[] = [];
+
+  // Compact meta header
+  const meta = doc.meta;
+  const keys = Object.keys(meta).filter(k => k !== 'checksum');
+  if (keys.length > 0) {
+    const metaLine = keys.map(k => `${k}=${meta[k]}`).join(' | ');
+    parts.push(`[${metaLine}]`);
+    parts.push('');
+  }
+
+  for (const section of doc.sections) {
+    parts.push(`=== ${section.name.toUpperCase()} ===`);
+    parts.push(section.content);
+    parts.push('');
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Escape a CSV field value to prevent formula injection in spreadsheets.
+ */
+function escapeCSV(value: string): string {
+  const stripped = value.trimStart();
+  if (stripped && '=+-@\t\r;'.includes(stripped[0])) {
+    return "'" + value;
+  }
+  return value;
+}
+
+/**
+ * Convert a PFM document to CSV.
+ * Row format: type, key/name, value/content
+ */
+export function toCSV(doc: PFMDocument): string {
+  const rows: string[] = [];
+  rows.push('type,key,value');
+
+  function csvRow(type: string, key: string, value: string): string {
+    // Quote fields that contain commas, quotes, or newlines
+    const fields = [type, key, escapeCSV(value)].map(f => {
+      if (f.includes(',') || f.includes('"') || f.includes('\n')) {
+        return '"' + f.replace(/"/g, '""') + '"';
+      }
+      return f;
+    });
+    return fields.join(',');
+  }
+
+  // Meta rows
+  for (const [key, val] of Object.entries(doc.meta)) {
+    if (val) rows.push(csvRow('meta', key, val));
+  }
+
+  // Section rows
+  for (const section of doc.sections) {
+    rows.push(csvRow('section', section.name, section.content));
+  }
+
+  return rows.join('\n') + '\n';
 }

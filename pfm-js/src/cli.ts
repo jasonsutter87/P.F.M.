@@ -22,10 +22,10 @@ import { resolve, basename, extname } from 'node:path';
 import { parse, isPFM, getSection } from './parser.js';
 import { serialize } from './serialize.js';
 import { validateChecksum } from './checksum.js';
-import { toJSON, fromJSON, toMarkdown } from './convert.js';
+import { toJSON, fromJSON, toMarkdown, fromText, fromMarkdown, fromCSV, toCSV, toText } from './convert.js';
 import type { PFMDocument } from './types.js';
 
-const VERSION = '0.1.5';
+const VERSION = '0.1.6';
 
 function printUsage(): void {
   console.log('PFM - Pure Fucking Magic');
@@ -285,8 +285,12 @@ async function cmdConvert(args: string[]): Promise<void> {
       result = toJSON(doc);
     } else if (format === 'md') {
       result = toMarkdown(doc);
+    } else if (format === 'csv') {
+      result = toCSV(doc);
+    } else if (format === 'txt') {
+      result = toText(doc);
     } else {
-      console.error(`Unsupported format: ${format}. Use: json, md`);
+      console.error(`Unsupported format: ${format}. Use: json, md, csv, txt`);
       process.exit(1);
       return;
     }
@@ -301,8 +305,14 @@ async function cmdConvert(args: string[]): Promise<void> {
     let doc: PFMDocument;
     if (format === 'json') {
       doc = fromJSON(data);
+    } else if (format === 'md') {
+      doc = fromMarkdown(data);
+    } else if (format === 'csv') {
+      doc = fromCSV(data);
+    } else if (format === 'txt') {
+      doc = fromText(data);
     } else {
-      console.error(`Unsupported format for import: ${format}. Use: json`);
+      console.error(`Unsupported format for import: ${format}. Use: json, md, csv, txt`);
       process.exit(1);
       return;
     }
