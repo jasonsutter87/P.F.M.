@@ -25,7 +25,7 @@ import { validateChecksum } from './checksum.js';
 import { toJSON, fromJSON, toMarkdown, fromText, fromMarkdown, fromCSV, toCSV, toText } from './convert.js';
 import type { PFMDocument } from './types.js';
 
-const VERSION = '0.1.8';
+const VERSION = '0.1.9';
 
 function printUsage(): void {
   console.log('PFM - Pure Fucking Magic');
@@ -54,10 +54,10 @@ function printUsage(): void {
 
 function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
+    const chunks: string[] = [];
     process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (chunk: Buffer) => chunks.push(chunk));
-    process.stdin.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    process.stdin.on('data', (chunk: string) => chunks.push(chunk));
+    process.stdin.on('end', () => resolve(chunks.join('')));
     process.stdin.on('error', reject);
     // If stdin is a TTY, resolve immediately with empty string
     if (process.stdin.isTTY) resolve('');
