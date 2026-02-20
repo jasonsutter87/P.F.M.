@@ -31,7 +31,7 @@ const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
  *
  * @example
  * ```ts
- * import { parse } from 'pfm';
+ * import { parse } from 'get-pfm';
  *
  * const text = fs.readFileSync('report.pfm', 'utf-8');
  * const doc = parse(text);

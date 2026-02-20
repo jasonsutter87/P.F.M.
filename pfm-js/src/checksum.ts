@@ -18,7 +18,7 @@ import type { PFMDocument, PFMSection, ChecksumResult } from './types.js';
  *
  * @example
  * ```ts
- * import { parse, computeChecksum } from 'pfm';
+ * import { parse, computeChecksum } from 'get-pfm';
  *
  * const doc = parse(text);
  * const hash = await computeChecksum(doc.sections);

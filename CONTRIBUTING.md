@@ -5,9 +5,9 @@ Thanks for your interest in PFM. Here's how you can help.
 ## Quick Links
 
 - [GitHub Issues](https://github.com/jasonsutter87/P.F.M./issues)
-- [Web Viewer & Converter](https://jasonsutter87.github.io/P.F.M./)
-- [Python Package (PyPI)](https://pypi.org/project/pfm/)
-- [npm Package](https://www.npmjs.com/package/pfm)
+- [Web Viewer & Converter](https://getpfm.io/)
+- [Python Package (PyPI)](https://pypi.org/project/get-pfm/)
+- [npm Package](https://www.npmjs.com/package/get-pfm)
 
 ## Ways to Contribute
 

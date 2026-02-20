@@ -22,7 +22,7 @@ import { computeChecksum } from './checksum.js';
  *
  * @example
  * ```ts
- * import { serialize } from 'pfm';
+ * import { serialize } from 'get-pfm';
  *
  * const text = await serialize({
  *   formatVersion: '1.0',

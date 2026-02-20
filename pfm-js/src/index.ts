@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { parse, getSection, validateChecksum } from 'pfm';
+ * import { parse, getSection, validateChecksum } from 'get-pfm';
  *
  * const doc = parse(pfmText);
  * console.log(doc.meta.agent);

@@ -7,13 +7,13 @@ Zero dependencies. Works in Node.js 18+ and browsers.
 ## Install
 
 ```bash
-npm install pfm
+npm install get-pfm
 ```
 
 ## Quick Start
 
 ```ts
-import { parse, getSection, validateChecksum } from 'pfm';
+import { parse, getSection, validateChecksum } from 'get-pfm';
 import fs from 'fs';
 
 // Parse a .pfm file
