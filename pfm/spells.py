@@ -197,13 +197,22 @@ def geminio(*sources: "PFMDocument | str", agent: str = "", model: str = "") -> 
         else:
             docs.append(src)
 
-    # Collect parent IDs and tags
-    parent_ids = [d.id for d in docs if d.id]
+    MAX_TAGS = 100
+    MAX_TAG_LENGTH = 128
+    MAX_ID_LENGTH = 64
+
+    # Collect parent IDs and tags with caps
+    parent_ids = [d.id[:MAX_ID_LENGTH] for d in docs if d.id]
     all_tags: list[str] = []
     for d in docs:
         if d.tags:
-            all_tags.extend(t.strip() for t in d.tags.split(",") if t.strip())
-    unique_tags = list(dict.fromkeys(all_tags))  # preserve order, dedupe
+            for t in d.tags.split(","):
+                t = t.strip()
+                if t and len(t) <= MAX_TAG_LENGTH:
+                    all_tags.append(t)
+                if len(all_tags) >= MAX_TAGS * len(docs):
+                    break
+    unique_tags = list(dict.fromkeys(all_tags))[:MAX_TAGS]
 
     # Create merged doc
     merged = PFMDocument.create(

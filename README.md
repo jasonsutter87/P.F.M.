@@ -127,6 +127,10 @@ pfm validate output.pfm
 # Quick file identification
 pfm identify output.pfm
 
+# Merge multiple .pfm files into one
+pfm merge part1.pfm part2.pfm -o combined.pfm
+pfm merge *.pfm -o all.pfm --agent "merger" --model "gpt-4"
+
 # Convert formats
 pfm convert to json output.pfm -o output.json
 pfm convert to md output.pfm -o output.md
@@ -152,18 +156,40 @@ pfm revelio report.pfm.enc              # Decrypt (Revelio)
 pfm unbreakable-vow report.pfm          # Sign (Unbreakable Vow)
 pfm vow-kept report.pfm                 # Verify signature
 pfm prior-incantato report.pfm          # Full provenance + integrity check
+pfm geminio part1.pfm part2.pfm         # Merge files (Doubling Charm)
 pfm pensieve ./conversations/           # Extract training data (Pensieve)
 ```
 
 ```python
-from pfm.spells import accio, polyjuice, fidelius, revelio, unbreakable_vow
+from pfm.spells import accio, polyjuice, fidelius, revelio, unbreakable_vow, geminio
 
 content = accio("report.pfm", "content")
 json_str = polyjuice(doc, "json")
 encrypted = fidelius(doc, "password")
 decrypted = revelio(encrypted, "password")
 unbreakable_vow(doc, "signing-key")
+merged = geminio("part1.pfm", "part2.pfm")
 ```
+
+### Claude Code Skills
+
+PFM ships with two [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills for capturing and recalling agent insights:
+
+```bash
+# Install skills
+cp -r skills/* ~/.claude/skills/
+```
+
+| Skill | What it does |
+|-------|-------------|
+| `/capture "insight"` | Quick-save a finding as a `.pfm` file in `captures/` |
+| `/capture start "label"` | Start recording — every exchange auto-saves to disk |
+| `/capture end` | Merge recorded exchanges into one `.pfm` with full transcript |
+| `/capture compact` | Mid-span checkpoint — merge what we have so far, keep recording |
+| `/recall last` | Load the most recent capture back into Claude Code memory |
+| `/recall captures/` | Load all captures from a directory |
+
+Captures survive context compaction — exchanges are written to disk incrementally, so nothing is lost even in long sessions.
 
 ### Chrome Extension
 
@@ -330,6 +356,7 @@ pfm/
 │   ├── popup/                  # Extension popup UI
 │   ├── viewer/                 # Full-tab .pfm viewer
 │   └── shared/                 # PFM core (parser, serializer, converters)
+├── skills/                     # Claude Code skills (capture + recall)
 ├── docs/                       # GitHub Pages SPA (viewer & converter)
 ├── tests/                      # 123 Python tests + conformance vectors
 └── examples/

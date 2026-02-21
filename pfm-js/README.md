@@ -22,6 +22,7 @@ pfm read output.pfm content
 pfm validate output.pfm
 pfm convert to json output.pfm -o output.json
 pfm identify output.pfm
+pfm merge part1.pfm part2.pfm -o combined.pfm
 
 # Export conversations to fine-tuning data
 pfm export ./conversations/ -o training.jsonl --format openai
@@ -39,6 +40,7 @@ Every command has a Harry Potter spell alias. Run `pfm spells` for the full spel
 ```bash
 pfm accio report.pfm content            # Summon a section
 pfm polyjuice report.pfm json           # Transform to another format
+pfm geminio part1.pfm part2.pfm         # Merge files (Doubling Charm)
 pfm prior-incantato report.pfm          # Full provenance + integrity check
 pfm pensieve ./conversations/           # Extract training data (Pensieve)
 ```

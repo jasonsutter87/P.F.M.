@@ -31,7 +31,7 @@ import { loadAndExport } from './export.js';
 import type { ExportFormat } from './export.js';
 import type { PFMDocument } from './types.js';
 
-const VERSION = '0.2.0';
+const VERSION = '0.2.1';
 
 function printUsage(): void {
   console.log('PFM - Pure Fucking Magic');
@@ -369,9 +369,22 @@ async function cmdMerge(args: string[]): Promise<void> {
     return;
   }
 
+  const MAX_SOURCE_COUNT = 100;
+  const MAX_INPUT_BYTES = 100 * 1024 * 1024; // 100 MB
+  const MAX_SECTIONS = 10_000;
+  const MAX_TAGS = 100;
+  const MAX_TAG_LENGTH = 128;
+  const MAX_ID_LENGTH = 64;
+  const VALID_SECTION_NAME = /^[a-z][a-z0-9_-]{0,63}$/;
+
   const pos = getPositional(args);
   if (pos.length < 2) {
     console.error('Error: Need at least 2 .pfm files to merge');
+    process.exit(1);
+  }
+
+  if (pos.length > MAX_SOURCE_COUNT) {
+    console.error(`Error: Too many source files (max ${MAX_SOURCE_COUNT})`);
     process.exit(1);
   }
 
@@ -379,26 +392,59 @@ async function cmdMerge(args: string[]): Promise<void> {
   const model = getFlag(args, '--model', '-m');
   const output = getFlag(args, '--output', '-o') || 'merged.pfm';
 
-  // Parse all source docs
+  // Output path traversal protection
+  const { isAbsolute: isAbs } = await import('node:path');
+  const { statSync } = await import('node:fs');
+  if (isAbs(output) || output.includes('..')) {
+    console.error('Error: Output path must be a relative path without traversal');
+    process.exit(1);
+  }
+  const resolvedOutput = resolve(output);
+  const cwd = resolve(process.cwd());
+  if (!resolvedOutput.startsWith(cwd + '/') && resolvedOutput !== cwd) {
+    console.error('Error: Output path must be within the current directory');
+    process.exit(1);
+  }
+
+  // Input validation: extension, existence, size
   const docs: PFMDocument[] = [];
   for (const filePath of pos) {
+    if (!filePath.toLowerCase().endsWith('.pfm')) {
+      console.error(`Error: Only .pfm files are accepted: ${filePath}`);
+      process.exit(1);
+    }
     if (!existsSync(filePath)) {
       console.error(`Error: File not found: ${filePath}`);
+      process.exit(1);
+    }
+    const stat = statSync(filePath);
+    if (!stat.isFile()) {
+      console.error(`Error: Not a regular file: ${filePath}`);
+      process.exit(1);
+    }
+    if (stat.size > MAX_INPUT_BYTES) {
+      console.error(`Error: File too large (>${MAX_INPUT_BYTES} bytes): ${filePath}`);
       process.exit(1);
     }
     const text = readFileSync(filePath, 'utf-8');
     docs.push(parse(text));
   }
 
-  // Collect parent IDs and tags
-  const parentIds = docs.map((d) => d.meta.id).filter(Boolean);
+  // Collect parent IDs and tags with caps
+  const parentIds = docs.map((d) => d.meta.id?.slice(0, MAX_ID_LENGTH)).filter(Boolean) as string[];
   const allTags: string[] = [];
   for (const d of docs) {
     if (d.meta.tags) {
-      allTags.push(...d.meta.tags.split(',').map((t) => t.trim()).filter(Boolean));
+      for (const t of d.meta.tags.split(',')) {
+        const trimmed = t.trim();
+        if (trimmed && trimmed.length <= MAX_TAG_LENGTH && !trimmed.includes('\n')) {
+          allTags.push(trimmed);
+        }
+        if (allTags.length >= MAX_TAGS * docs.length) break;
+      }
     }
   }
-  const uniqueTags = [...new Set(allTags)];
+  const uniqueTags = [...new Set(allTags)].slice(0, MAX_TAGS);
 
   // Build merged content with source headers
   const contentParts: string[] = [];
@@ -431,10 +477,18 @@ async function cmdMerge(args: string[]): Promise<void> {
     merged.sections.push({ name: 'content', content: contentParts.join('\n\n') });
   }
 
-  // Merge non-content sections
+  // Merge non-content sections with section count and name validation
   for (const doc of docs) {
     for (const section of doc.sections) {
       if (section.name !== 'content') {
+        if (merged.sections.length >= MAX_SECTIONS) {
+          console.error(`Error: Merged document would exceed maximum section count (${MAX_SECTIONS})`);
+          process.exit(1);
+        }
+        if (!VALID_SECTION_NAME.test(section.name)) {
+          console.error(`Error: Invalid section name in source document: ${section.name}`);
+          process.exit(1);
+        }
         const sourceLabel = doc.meta.id ? doc.meta.id.slice(0, 8) : 'unknown';
         merged.sections.push({
           name: section.name,

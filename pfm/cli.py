@@ -507,22 +507,48 @@ def cmd_prior_incantato(args: argparse.Namespace) -> None:
 def cmd_merge(args: argparse.Namespace) -> None:
     """Merge multiple .pfm files into one."""
     from pfm.spells import geminio
+    from pfm.spec import MAX_FILE_SIZE
+
+    MAX_SOURCE_COUNT = 100
 
     sources = args.files
     if len(sources) < 2:
         print("Error: Need at least 2 .pfm files to merge", file=sys.stderr)
         sys.exit(1)
 
+    if len(sources) > MAX_SOURCE_COUNT:
+        print(f"Error: Too many source files (max {MAX_SOURCE_COUNT})", file=sys.stderr)
+        sys.exit(1)
+
+    cwd = Path.cwd().resolve()
     for f in sources:
-        if not Path(f).is_file():
+        p = Path(f)
+        if not p.is_file():
             print(f"Error: File not found: {f}", file=sys.stderr)
+            sys.exit(1)
+        if p.suffix.lower() != ".pfm":
+            print(f"Error: Only .pfm files are accepted: {f}", file=sys.stderr)
+            sys.exit(1)
+        try:
+            size = p.stat().st_size
+        except OSError:
+            print(f"Error: Cannot stat file: {f}", file=sys.stderr)
+            sys.exit(1)
+        if size > MAX_FILE_SIZE:
+            print(f"Error: File too large (>{MAX_FILE_SIZE} bytes): {f}", file=sys.stderr)
             sys.exit(1)
 
     merged = geminio(*sources, agent=args.agent or "", model=args.model or "")
 
     output = args.output or "merged.pfm"
-    if ".." in Path(output).parts:
-        print("Error: Output path must not contain '..' (path traversal)", file=sys.stderr)
+    if Path(output).is_absolute() or ".." in Path(output).parts:
+        print("Error: Output path must be a relative path without traversal", file=sys.stderr)
+        sys.exit(1)
+    resolved = Path(output).resolve()
+    try:
+        resolved.relative_to(cwd)
+    except ValueError:
+        print("Error: Output path must be within the current directory", file=sys.stderr)
         sys.exit(1)
     nbytes = merged.write(output)
     parent_count = len(merged.parent.split(", ")) if merged.parent else 0
