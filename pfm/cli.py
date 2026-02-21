@@ -7,6 +7,7 @@ Commands:
   pfm read     - Read a specific section from a .pfm file
   pfm validate - Validate a .pfm file (checksum, structure)
   pfm convert  - Convert to/from JSON, CSV, TXT, Markdown
+  pfm merge    - Merge multiple .pfm files into one
   pfm export   - Export .pfm conversations to fine-tuning JSONL
   pfm encrypt  - Encrypt a .pfm file with AES-256-GCM
   pfm decrypt  - Decrypt an encrypted .pfm file
@@ -442,6 +443,9 @@ def cmd_spells(args: argparse.Namespace) -> None:
     print("  prior-incantato <file>            Reveal history and integrity of a document")
     print("                                   (alias for: pfm validate)")
     print()
+    print("  geminio <file1> <file2> [...]     Merge multiple .pfm files into one (Doubling Charm)")
+    print("                                   (alias for: pfm merge)")
+    print()
     print("  pensieve <path> [-o out] [--fmt]  Extract memories for training data")
     print("                                   (alias for: pfm export)")
     print()
@@ -453,6 +457,7 @@ def cmd_spells(args: argparse.Namespace) -> None:
     print("  pfm unbreakable-vow report.pfm -s mysecret")
     print("  pfm vow-kept report.pfm -s mysecret")
     print("  pfm prior-incantato report.pfm")
+    print("  pfm geminio part1.pfm part2.pfm -o combined.pfm")
     print()
     print("Python API:")
     print("  from pfm.spells import accio, polyjuice, fidelius, revelio")
@@ -497,6 +502,34 @@ def cmd_prior_incantato(args: argparse.Namespace) -> None:
     print(f"  Integrity:  {'VALID' if result['integrity'] else 'INVALID'}")
     print(f"  Signed:     {'Yes (' + result['sig_algo'] + ')' if result['signed'] else 'No'}")
     print(f"  Fingerprint: {result['fingerprint']}")
+
+
+def cmd_merge(args: argparse.Namespace) -> None:
+    """Merge multiple .pfm files into one."""
+    from pfm.spells import geminio
+
+    sources = args.files
+    if len(sources) < 2:
+        print("Error: Need at least 2 .pfm files to merge", file=sys.stderr)
+        sys.exit(1)
+
+    for f in sources:
+        if not Path(f).is_file():
+            print(f"Error: File not found: {f}", file=sys.stderr)
+            sys.exit(1)
+
+    merged = geminio(*sources, agent=args.agent or "", model=args.model or "")
+
+    output = args.output or "merged.pfm"
+    if ".." in Path(output).parts:
+        print("Error: Output path must not contain '..' (path traversal)", file=sys.stderr)
+        sys.exit(1)
+    nbytes = merged.write(output)
+    parent_count = len(merged.parent.split(", ")) if merged.parent else 0
+    print(f"Merged {len(sources)} files -> {output} ({nbytes} bytes)")
+    print(f"  Parent lineage: {parent_count} source IDs")
+    if merged.tags:
+        print(f"  Tags: {merged.tags}")
 
 
 def cmd_identify(args: argparse.Namespace) -> None:
@@ -550,6 +583,13 @@ def main() -> None:
     p_convert.add_argument("format_or_input", help="Format (json, csv, txt, md) or input file")
     p_convert.add_argument("input", nargs="?", default=None, help="Input file path")
     p_convert.add_argument("-o", "--output", help="Output file path")
+
+    # merge
+    p_merge = sub.add_parser("merge", help="Merge multiple .pfm files into one")
+    p_merge.add_argument("files", nargs="+", help="Two or more .pfm files to merge")
+    p_merge.add_argument("-o", "--output", help="Output file path (default: merged.pfm)")
+    p_merge.add_argument("-a", "--agent", help="Agent name for merged doc")
+    p_merge.add_argument("-m", "--model", help="Model ID for merged doc")
 
     # view
     p_view = sub.add_parser("view", help="View a .pfm file (TUI, web, or HTML)")
@@ -626,6 +666,13 @@ def main() -> None:
     p_prior = sub.add_parser("prior-incantato", help="Reveal history and integrity")
     p_prior.add_argument("path", help="Path to .pfm file")
 
+    # geminio (alias for merge)
+    p_geminio = sub.add_parser("geminio", help="Merge .pfm files (Doubling Charm)")
+    p_geminio.add_argument("files", nargs="+", help="Two or more .pfm files to merge")
+    p_geminio.add_argument("-o", "--output", help="Output file path (default: merged.pfm)")
+    p_geminio.add_argument("-a", "--agent", help="Agent name for merged doc")
+    p_geminio.add_argument("-m", "--model", help="Model ID for merged doc")
+
     # export
     p_export = sub.add_parser("export", help="Export .pfm conversations to fine-tuning JSONL")
     p_export.add_argument("path", help="Path to .pfm file or directory")
@@ -655,6 +702,7 @@ def main() -> None:
         print("  pfm decrypt output.pfm.enc -p mypassword")
         print("  pfm sign output.pfm -s mysecret")
         print("  pfm verify output.pfm -s mysecret")
+        print("  pfm merge part1.pfm part2.pfm -o combined.pfm")
         print("  pfm export ./conversations/ -o training.jsonl --format openai")
         print("  pfm identify output.pfm")
         print()
@@ -669,6 +717,7 @@ def main() -> None:
         print("  pfm revelio report.pfm.enc            Decrypt (Revelio)")
         print("  pfm unbreakable-vow report.pfm        Sign (Unbreakable Vow)")
         print("  pfm prior-incantato report.pfm        Integrity + provenance")
+        print("  pfm geminio part1.pfm part2.pfm       Merge files (Doubling Charm)")
         print("  pfm pensieve ./conversations/         Extract training data")
         print()
         print("Run 'pfm spells' for the full spellbook.")
@@ -696,6 +745,8 @@ def main() -> None:
         "unbreakable-vow": cmd_sign,
         "vow-kept": cmd_verify,
         "prior-incantato": cmd_prior_incantato,
+        "merge": cmd_merge,
+        "geminio": cmd_merge,
         "export": cmd_export,
         "pensieve": cmd_export,
     }

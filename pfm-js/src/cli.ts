@@ -9,12 +9,14 @@
  *   pfm validate  - Validate structure and checksum
  *   pfm convert   - Convert to/from JSON, Markdown
  *   pfm export    - Export conversations to fine-tuning JSONL
+ *   pfm merge     - Merge multiple .pfm files into one
  *   pfm identify  - Quick check if a file is PFM format
  *   pfm spells    - List all PFM spells
  *
  * Spells (aliased commands):
  *   pfm accio            - Summon a section (alias for read)
  *   pfm polyjuice        - Transform format (alias for convert to)
+ *   pfm geminio           - Merge files (alias for merge, Doubling Charm)
  *   pfm prior-incantato  - Integrity + provenance (alias for validate)
  *   pfm pensieve         - Extract training data (alias for export)
  */
@@ -41,6 +43,7 @@ function printUsage(): void {
   console.log('  pfm validate output.pfm');
   console.log('  pfm convert to json output.pfm -o output.json');
   console.log('  pfm convert from json data.json -o imported.pfm');
+  console.log('  pfm merge part1.pfm part2.pfm -o combined.pfm');
   console.log('  pfm export ./conversations/ -o training.jsonl --format openai');
   console.log('  pfm identify output.pfm');
   console.log();
@@ -51,6 +54,7 @@ function printUsage(): void {
   console.log('  pfm accio report.pfm content         Summon a section');
   console.log('  pfm polyjuice report.pfm json         Transform format');
   console.log('  pfm prior-incantato report.pfm        Integrity + provenance');
+  console.log('  pfm geminio part1.pfm part2.pfm       Merge files (Doubling Charm)');
   console.log('  pfm pensieve ./conversations/         Extract training data');
   console.log();
   console.log("Run 'pfm spells' for the full spellbook.");
@@ -354,6 +358,102 @@ async function cmdConvert(args: string[]): Promise<void> {
   }
 }
 
+async function cmdMerge(args: string[]): Promise<void> {
+  if (hasFlag(args, '--help', '-h')) {
+    console.log('Usage: pfm merge <file1> <file2> [...] [-o output] [-a agent] [-m model]');
+    console.log();
+    console.log('Merge multiple .pfm files into one.');
+    console.log('  -o, --output  Output file (default: merged.pfm)');
+    console.log('  -a, --agent   Agent name for merged doc (inherits from first source)');
+    console.log('  -m, --model   Model ID for merged doc (inherits from first source)');
+    return;
+  }
+
+  const pos = getPositional(args);
+  if (pos.length < 2) {
+    console.error('Error: Need at least 2 .pfm files to merge');
+    process.exit(1);
+  }
+
+  const agent = getFlag(args, '--agent', '-a');
+  const model = getFlag(args, '--model', '-m');
+  const output = getFlag(args, '--output', '-o') || 'merged.pfm';
+
+  // Parse all source docs
+  const docs: PFMDocument[] = [];
+  for (const filePath of pos) {
+    if (!existsSync(filePath)) {
+      console.error(`Error: File not found: ${filePath}`);
+      process.exit(1);
+    }
+    const text = readFileSync(filePath, 'utf-8');
+    docs.push(parse(text));
+  }
+
+  // Collect parent IDs and tags
+  const parentIds = docs.map((d) => d.meta.id).filter(Boolean);
+  const allTags: string[] = [];
+  for (const d of docs) {
+    if (d.meta.tags) {
+      allTags.push(...d.meta.tags.split(',').map((t) => t.trim()).filter(Boolean));
+    }
+  }
+  const uniqueTags = [...new Set(allTags)];
+
+  // Build merged content with source headers
+  const contentParts: string[] = [];
+  for (const doc of docs) {
+    for (const section of doc.sections) {
+      if (section.name === 'content') {
+        const sourceLabel = doc.meta.id ? doc.meta.id.slice(0, 8) : 'unknown';
+        const created = doc.meta.created || 'unknown';
+        contentParts.push(`--- [${sourceLabel}] ${created} ---\n${section.content}`);
+      }
+    }
+  }
+
+  const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const merged: PFMDocument = {
+    formatVersion: '1.0',
+    isStream: false,
+    meta: {
+      id: crypto.randomUUID(),
+      agent: agent || docs[0].meta.agent || 'cli',
+      model: model || docs[0].meta.model || undefined,
+      created: now,
+      parent: parentIds.join(', '),
+      tags: uniqueTags.length > 0 ? uniqueTags.join(', ') : undefined,
+    },
+    sections: [],
+  };
+
+  if (contentParts.length > 0) {
+    merged.sections.push({ name: 'content', content: contentParts.join('\n\n') });
+  }
+
+  // Merge non-content sections
+  for (const doc of docs) {
+    for (const section of doc.sections) {
+      if (section.name !== 'content') {
+        const sourceLabel = doc.meta.id ? doc.meta.id.slice(0, 8) : 'unknown';
+        merged.sections.push({
+          name: section.name,
+          content: `--- [${sourceLabel}] ---\n${section.content}`,
+        });
+      }
+    }
+  }
+
+  const text = await serialize(merged);
+  writeFileSync(output, text, 'utf-8');
+  const bytes = Buffer.byteLength(text, 'utf-8');
+  console.log(`Merged ${pos.length} files -> ${output} (${bytes} bytes)`);
+  console.log(`  Parent lineage: ${parentIds.length} source IDs`);
+  if (uniqueTags.length > 0) {
+    console.log(`  Tags: ${uniqueTags.join(', ')}`);
+  }
+}
+
 function cmdIdentify(args: string[]): void {
   if (hasFlag(args, '--help', '-h')) {
     console.log('Usage: pfm identify <path>');
@@ -387,6 +487,9 @@ function cmdSpells(): void {
   console.log('  prior-incantato <file>            Reveal history and integrity of a document');
   console.log('                                   (alias for: pfm validate + provenance)');
   console.log();
+  console.log('  geminio <file1> <file2> [...]     Merge multiple .pfm files into one (Doubling Charm)');
+  console.log('                                   (alias for: pfm merge)');
+  console.log();
   console.log('  pensieve <path> [-o out] [--fmt]  Extract memories for training data');
   console.log('                                   (alias for: pfm export)');
   console.log();
@@ -398,6 +501,7 @@ function cmdSpells(): void {
   console.log('  pfm accio report.pfm content');
   console.log('  pfm polyjuice report.pfm json -o report.json');
   console.log('  pfm prior-incantato report.pfm');
+  console.log('  pfm geminio part1.pfm part2.pfm -o combined.pfm');
   console.log();
   console.log('Python API:');
   console.log("  from pfm.spells import accio, polyjuice, fidelius, revelio");
@@ -566,6 +670,10 @@ async function main(): Promise<void> {
       break;
     case 'convert':
       await cmdConvert(rest);
+      break;
+    case 'merge':
+    case 'geminio':
+      await cmdMerge(rest);
       break;
     case 'identify':
       cmdIdentify(rest);

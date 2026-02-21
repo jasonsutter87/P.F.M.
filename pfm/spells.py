@@ -157,3 +157,84 @@ def vow_kept(doc: "PFMDocument", secret: str | bytes) -> bool:
     """
     from pfm.security import verify
     return verify(doc, secret)
+
+
+# =============================================================================
+# geminio - Merge multiple documents into one (Doubling Charm)
+# =============================================================================
+
+def geminio(*sources: "PFMDocument | str", agent: str = "", model: str = "") -> "PFMDocument":
+    """
+    Cast Geminio — merge multiple .pfm documents into one.
+    The Doubling Charm combines many into a unified whole,
+    preserving lineage via the parent field.
+
+        merged = geminio("part1.pfm", "part2.pfm", "part3.pfm")
+        merged = geminio(doc1, doc2, doc3, agent="my-agent")
+        merged.write("combined.pfm")
+
+    Args:
+        *sources: File paths (str) or PFMDocument objects to merge.
+        agent: Agent name for the merged doc (default: inherits from first source).
+        model: Model ID for the merged doc (default: inherits from first source).
+
+    Returns:
+        A new PFMDocument with all content sections concatenated,
+        parent set to comma-separated source IDs,
+        and tags merged from all sources.
+    """
+    from pfm.document import PFMDocument
+    from pfm.reader import PFMReader
+
+    if len(sources) < 2:
+        raise ValueError("Geminio requires at least 2 sources to merge")
+
+    # Resolve all sources to PFMDocument objects
+    docs: list[PFMDocument] = []
+    for src in sources:
+        if isinstance(src, str):
+            docs.append(PFMReader.read(src))
+        else:
+            docs.append(src)
+
+    # Collect parent IDs and tags
+    parent_ids = [d.id for d in docs if d.id]
+    all_tags: list[str] = []
+    for d in docs:
+        if d.tags:
+            all_tags.extend(t.strip() for t in d.tags.split(",") if t.strip())
+    unique_tags = list(dict.fromkeys(all_tags))  # preserve order, dedupe
+
+    # Create merged doc
+    merged = PFMDocument.create(
+        agent=agent or docs[0].agent,
+        model=model or docs[0].model,
+        parent=", ".join(parent_ids),
+        tags=", ".join(unique_tags) if unique_tags else "",
+    )
+
+    # Merge content sections: concatenate with source headers
+    content_parts: list[str] = []
+    for i, doc in enumerate(docs):
+        for section in doc.sections:
+            if section.name == "content":
+                source_label = doc.id[:8] if doc.id else f"source-{i}"
+                created = doc.created or "unknown"
+                content_parts.append(
+                    f"--- [{source_label}] {created} ---\n{section.content}"
+                )
+
+    if content_parts:
+        merged.add_section("content", "\n\n".join(content_parts))
+
+    # Merge any non-content sections (chain, etc.) — append with source prefix
+    for i, doc in enumerate(docs):
+        for section in doc.sections:
+            if section.name != "content":
+                source_label = doc.id[:8] if doc.id else f"source-{i}"
+                merged.add_section(
+                    section.name,
+                    f"--- [{source_label}] ---\n{section.content}",
+                )
+
+    return merged
