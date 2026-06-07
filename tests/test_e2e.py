@@ -210,7 +210,11 @@ class TestCLI:
             cwd=str(Path(__file__).parent.parent),
         )
         assert result.returncode == 0
-        assert "0.1.0" in result.stdout
+        # Assert against the package's own version so a release bump
+        # can't silently strand this test (it sat asserting "0.1.0"
+        # through two releases).
+        from pfm import __version__
+        assert __version__ in result.stdout
 
     def test_cli_create_and_inspect(self):
         with tempfile.NamedTemporaryFile(suffix=".pfm", delete=False) as f:

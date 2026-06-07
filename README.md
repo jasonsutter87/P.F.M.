@@ -2,7 +2,7 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
-[![Tests: 178 passing](https://img.shields.io/badge/tests-178%20passing-brightgreen.svg)]()
+[![Tests: 224 passing](https://img.shields.io/badge/tests-224%20passing-brightgreen.svg)]()
 [![npm: get-pfm](https://img.shields.io/badge/npm-get--pfm-cb3837.svg)](https://www.npmjs.com/package/get-pfm)
 [![Security: A+](https://img.shields.io/badge/security-A%2B-brightgreen.svg)]()
 [![Web Viewer](https://img.shields.io/badge/web-viewer%20%26%20converter-58a6ff.svg)](https://getpfm.io/)
@@ -358,12 +358,16 @@ pfm/
 │   └── shared/                 # PFM core (parser, serializer, converters)
 ├── skills/                     # Claude Code skills (capture + recall)
 ├── docs/                       # GitHub Pages SPA (viewer & converter)
-├── tests/                      # 123 Python tests + conformance vectors
+├── tests/                      # 169 Python tests + conformance vectors
+├── security_tests/             # Adversarial corpus (see SECURITY.md)
 └── examples/
     └── hello.pfm               # Example file
 ```
 
-**123 Python tests. 55 JS tests. 178 total. All passing.**
+Security disclosures + the open hardening challenges live in
+[SECURITY.md](SECURITY.md).
+
+**169 Python tests. 55 JS tests. 224 total. All passing.**
 
 ---
 
